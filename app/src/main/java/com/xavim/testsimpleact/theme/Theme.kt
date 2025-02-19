@@ -1,4 +1,4 @@
-package com.xavim.testsimpleact.ui.theme
+package com.xavim.testsimpleact.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
