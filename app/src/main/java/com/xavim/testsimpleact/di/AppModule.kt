@@ -13,10 +13,14 @@ import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
 import com.xavim.testsimpleact.domain.repository.DatasetRepository
 import com.xavim.testsimpleact.domain.repository.Logger
 import com.xavim.testsimpleact.domain.repository.SystemRepository
+//import com.xavim.testsimpleact.domain.useCase.CompleteDataEntryUseCase
 import com.xavim.testsimpleact.domain.useCase.CreateNewEntryUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDataSetsUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDataEntryFormUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDatasetInstancesUseCase
+import com.xavim.testsimpleact.domain.useCase.GetExistingDataValuesUseCase
+import com.xavim.testsimpleact.domain.useCase.SaveDataEntryUseCase
+import com.xavim.testsimpleact.domain.useCase.ValidateDataEntryUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -136,11 +140,11 @@ object AppModule {
         return CreateNewEntryUseCase(dataEntry)
     }
 
-    @Provides
-    fun provideGetDatasetInstancesUseCase(
-        repository: DatasetInstanceRepository
-    ): GetDatasetInstancesUseCase =
-        GetDatasetInstancesUseCase(repository)
+//    @Provides
+//    fun provideGetDatasetInstancesUseCase(
+//        repository: DatasetInstanceRepository
+//    ): GetDatasetInstancesUseCase =
+//        GetDatasetInstancesUseCase(repository)
 
     @Provides
     fun provideGetDataEntryFormUseCase(
@@ -162,11 +166,11 @@ object AppModule {
 
     @Provides
     fun provideValidateDataEntryUseCase(): ValidateDataEntryUseCase =
-        ValidateDataEntryUseCase()
+        ValidateDataEntryUseCase()}
 
-    @Provides
-    fun provideCompleteDataEntryUseCase(
-        repository: DataEntryRepository
-    ): CompleteDataEntryUseCase =
-        CompleteDataEntryUseCase(repository)
-}
+//    @Provides
+//    fun provideCompleteDataEntryUseCase(
+//        repository: DataEntryRepository
+//    ): CompleteDataEntryUseCase =
+//        CompleteDataEntryUseCase(repository)
+//}

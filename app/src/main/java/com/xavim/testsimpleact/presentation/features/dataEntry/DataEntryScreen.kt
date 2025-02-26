@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,13 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +44,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -175,6 +183,7 @@ import kotlinx.coroutines.launch
 //    }
 //}
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DataEntryScreen(
     viewModel: DataEntryViewModel = hiltViewModel(),
@@ -240,7 +249,7 @@ fun DataEntryScreen(
                 ) {
                     Text(
                         text = state.message,
-                        color = MaterialTheme.colors.error
+                        color = Color.Red
                     )
                 }
             }
@@ -259,7 +268,10 @@ private fun DataEntrySection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = 2.dp
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 6.dp,
+            pressedElevation = 12.dp
+        )
     ) {
         Column {
             Row(
@@ -272,7 +284,7 @@ private fun DataEntrySection(
             ) {
                 Text(
                     text = section.name,
-                    style = MaterialTheme.typography.h6
+                    style = MaterialTheme.typography.titleMedium
                 )
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -310,7 +322,7 @@ private fun DataElementInput(
     ) {
         Text(
             text = element.name,
-            style = MaterialTheme.typography.subtitle1
+            style = MaterialTheme.typography.labelSmall
         )
 
         when (element.type) {

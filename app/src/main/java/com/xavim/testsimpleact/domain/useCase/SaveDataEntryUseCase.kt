@@ -1,5 +1,8 @@
 package com.xavim.testsimpleact.domain.useCase
 
+import com.xavim.testsimpleact.domain.repository.DataEntryRepository
+import javax.inject.Inject
+
 class SaveDataEntryUseCase @Inject constructor(
     private val repository: DataEntryRepository
 ) {

@@ -1,5 +1,7 @@
 package com.xavim.testsimpleact.domain.useCase
 
+import javax.inject.Inject
+
 class ValidateDataEntryUseCase @Inject constructor() {
     operator fun invoke(values: Map<String, String>): List<ValidationError> {
         val errors = mutableListOf<ValidationError>()

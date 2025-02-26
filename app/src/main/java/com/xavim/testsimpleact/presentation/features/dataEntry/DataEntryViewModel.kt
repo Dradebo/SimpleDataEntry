@@ -7,12 +7,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xavim.testsimpleact.domain.model.DataEntryElement
 import com.xavim.testsimpleact.domain.model.DataEntrySection
+import com.xavim.testsimpleact.domain.model.DataValue
+import com.xavim.testsimpleact.domain.repository.DataEntryRepository
 import com.xavim.testsimpleact.domain.repository.Logger
 import com.xavim.testsimpleact.domain.useCase.CreateNewEntryUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDataEntryFormUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

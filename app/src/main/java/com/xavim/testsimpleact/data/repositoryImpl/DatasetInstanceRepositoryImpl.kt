@@ -62,28 +62,46 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : DatasetInstanceRepository {
 
+//    override suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>> = flow {
+//        withContext(dispatcher) {
+//            try {
+//
+//                val instances = d2.dataSetModule().dataSetInstances()
+//                        .byDataSetUid().eq(datasetId)
+//
+//                        .blockingGet()
+//                .map { it.toDomainModel() }
+//
+//                emit(instances)
+//            } catch (e: Exception) {
+//                throw DatasetInstanceRepositoryException(
+//                    "Failed to fetch dataset instances",
+//                    e
+//                )
+//            }
+//        }
+//    }
+
     override suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>> = flow {
-        withContext(dispatcher) {
-            try {
-                val userOrgUnits = d2.organisationUnitModule().organisationUnits()
-                    .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
-                    .blockingGet()
 
-                val instances = userOrgUnits.flatMap { orgUnit ->
-                    d2.dataSetModule().dataSetInstances()
-                        .byDataSetUid().eq(datasetId)
-                        .byOrganisationUnitUid().eq(orgUnit.uid())
-                        .blockingGet()
-                }.map { it.toDomainModel() }
+//        val instances = d2.dataSetModule().dataSetInstances().byDataSetUid().eq(datasetId)
+//            .blockingGet().map { it.toDomainModel() }
 
-                emit(instances)
-            } catch (e: Exception) {
-                throw DatasetInstanceRepositoryException(
-                    "Failed to fetch dataset instances",
-                    e
-                )
-            }
-        }
+
+//      Prospective solution
+        val datasetUid = datasetId
+        val userOrgUnits = d2.organisationUnitModule().organisationUnits()
+            .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
+            .blockingGet()
+        val userOrgUnitUid = userOrgUnits.firstOrNull()?.uid()
+
+        val instances = d2.dataSetModule().dataSetInstances()
+            .byDataSetUid().eq(datasetUid)
+            .byOrganisationUnitUid().eq(userOrgUnitUid)
+            .blockingGet().map { it.toDomainModel() }
+
+
+        emit(instances)
     }
 
     override suspend fun getDatasetMetadata(datasetId: String): Flow<DatasetMetadata> = flow {

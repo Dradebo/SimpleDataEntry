@@ -27,8 +27,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.xavim.testsimpleact.navigation.Screen.DatasetScreen.AppNavigation
 import com.xavim.testsimpleact.presentation.core.AppScaffold
-import com.xavim.testsimpleact.screens.FormScreen
-import com.xavim.testsimpleact.ui.theme.TestsimpleactTheme
 import dagger.hilt.android.AndroidEntryPoint
 import org.hisp.dhis.mobile.ui.designsystem.component.IconButton
 import org.hisp.dhis.mobile.ui.designsystem.component.IconButtonStyle
