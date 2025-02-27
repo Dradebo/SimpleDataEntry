@@ -8,7 +8,7 @@ import javax.inject.Inject
 class GetExistingDataValuesUseCase @Inject constructor(
     private val repository: DataEntryRepository
 ) {
-    suspend operator fun invoke(
+    operator fun invoke(
         datasetId: String,
         periodId: String,
         orgUnitId: String,

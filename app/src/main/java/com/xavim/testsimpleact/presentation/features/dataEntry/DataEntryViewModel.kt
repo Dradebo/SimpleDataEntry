@@ -8,142 +8,40 @@ import androidx.lifecycle.viewModelScope
 import com.xavim.testsimpleact.domain.model.DataEntryElement
 import com.xavim.testsimpleact.domain.model.DataEntrySection
 import com.xavim.testsimpleact.domain.model.DataValue
+import com.xavim.testsimpleact.domain.model.ValidationError
 import com.xavim.testsimpleact.domain.repository.DataEntryRepository
 import com.xavim.testsimpleact.domain.repository.Logger
 import com.xavim.testsimpleact.domain.useCase.CreateNewEntryUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDataEntryFormUseCase
+import com.xavim.testsimpleact.domain.useCase.GetExistingDataValuesUseCase
+import com.xavim.testsimpleact.domain.useCase.SaveDataEntryUseCase
+import com.xavim.testsimpleact.domain.useCase.ValidateDataEntryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
-
-//@HiltViewModel
-//class DataEntryViewModel @Inject constructor(
-//    private val createNewEntryUseCase: CreateNewEntryUseCase,
-//    private val getDataEntryFormUseCase: GetDataEntryFormUseCase,
-//    private val logger : Logger,
-//    savedStateHandle: SavedStateHandle
-//
-//    ) : ViewModel() {
-//
-//        private val dataSetId: String = checkNotNull(savedStateHandle["datasetId"]) {
-//        "datasetId is required"
-//    }
-//
-//    private val periodId: String = checkNotNull(savedStateHandle["periodId"]) {
-//        "periodId is required"
-//    }
-//
-//    private val orgUnitId: String = checkNotNull(savedStateHandle["orgUnitId"]) {
-//        "orgUnitId is required"
-//    }
-//
-//    private val attributeOptionComboId: String = checkNotNull(savedStateHandle["attributeOptionComboId"]) {
-//        "attributeOptionComboId is required"
-//    }
-//
-//    private val _uiState = MutableStateFlow<DataEntryScreenState>(DataEntryScreenState.Loading)
-//    val uiState: StateFlow<DataEntryScreenState> = _uiState
-//
-//    private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
-//    val expandedSections: StateFlow<Set<String>> = _expandedSections
-//
-//
-//    init {
-//        initializeDataEntry(dataSetId,periodId,orgUnitId, attributeOptionComboId)
-//    }
-//
-//    fun initializeDataEntry(
-//        datasetId: String,
-//        periodId: String,
-//        orgUnitId: String,
-//        attributeOptionComboId: String?
-//    ) {
-//        viewModelScope.launch {
-//            try {
-//
-//                Log.d(TAG, "intialiseDataEntryForm called for datasetId: $datasetId")
-//                val dataValues = getDataEntryFormUseCase(
-//                    datasetId
-//
-//                ).collect { values ->
-//                    // Transform values into DataEntryElement objects
-//                    _uiState.value = DataEntryScreenState.Success(
-//                        sections = getSectionsFromValues(values)
-//                    )
-//                }
-//            } catch (e: Exception) {
-//                _uiState.value = DataEntryScreenState.Error(e.message ?: "Unknown error")
-//            }
-//        }
-//    }
-//
-//    fun onSectionHeaderClick(sectionUid: String) {
-//        viewModelScope.launch {
-//            val currentExpanded = _expandedSections.value
-//            if (currentExpanded.contains(sectionUid)) {
-//                _expandedSections.value = currentExpanded.minus(sectionUid)
-//            } else {
-//                _expandedSections.value = currentExpanded.plus(sectionUid)
-//            }
-//        }
-//    }
-//
-//    fun onInputChange(dataElementUid: String, value: String) {
-//        viewModelScope.launch {
-//            val currentState = _uiState.value
-//            if (currentState is DataEntryScreenState.Success) {
-//                val updatedValues = currentState.sections
-//                    .map { section ->
-//                        section.dataElements.map { element ->
-//                            if (element.dataElementId == dataElementUid) {
-//                                element.copy(value = value)
-//                            } else element
-//                        }
-//                    }
-//                _uiState.value = currentState.copy(
-//                    // sections = updatedValues
-//                )
-//            }
-//        }
-//    }
-//
-//    private fun getSectionsFromValues(values: List<DataEntrySection>): List<DataEntrySection> {
-//
-//        return values.map { entry ->
-//            DataEntryElement(
-//                dataElementId = entry.uid,
-//                name = entry.name,
-//                type = "text",
-//                value = "",
-//                optionSetUid = "Option",
-//                style = "style"
-//            )
-//        }.let { elements ->
-//            DataEntrySection(
-//                uid = "",
-//                name = "",
-//                dataElements = elements
-//            )
-//        }.let { listOf(it) }
-//    }
-//}
-
 
 @HiltViewModel
 class DataEntryViewModel @Inject constructor(
-    private val repository: DataEntryRepository,
+    private val getDataEntryFormUseCase: GetDataEntryFormUseCase,
+    private val getExistingDataValuesUseCase: GetExistingDataValuesUseCase,
+    private val saveDataEntryUseCase: SaveDataEntryUseCase,
+    private val validateDataEntryUseCase: ValidateDataEntryUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val datasetId: String = checkNotNull(savedStateHandle["datasetId"])
-    private val periodId: String? = savedStateHandle["periodId"]
-    private val orgUnitId: String? = savedStateHandle["orgUnitId"]
-    private val attributeOptionComboId: String? = savedStateHandle["attributeOptionComboId"]
+    private val datasetId: String = checkNotNull(savedStateHandle[DataEntryScreen.DATASET_ID_KEY])
+    private val periodId: String? = savedStateHandle[DataEntryScreen.PERIOD_ID_KEY]
+    private val orgUnitId: String? = savedStateHandle[DataEntryScreen.ORG_UNIT_ID_KEY]
+    private val attributeOptionComboId: String? = savedStateHandle[DataEntryScreen.ATTRIBUTE_OPTION_COMBO_ID_KEY]
 
     private val _uiState = MutableStateFlow<DataEntryState>(DataEntryState.Loading)
     val uiState: StateFlow<DataEntryState> = _uiState.asStateFlow()
@@ -152,32 +50,55 @@ class DataEntryViewModel @Inject constructor(
     val expandedSections: StateFlow<Set<String>> = _expandedSections.asStateFlow()
 
     private val _dataValues = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val _originalValues = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    private val _validationErrors = MutableStateFlow<List<ValidationError>>(emptyList())
+    val validationErrors: StateFlow<List<ValidationError>> = _validationErrors.asStateFlow()
+
+    private val _hasUnsavedChanges = MutableStateFlow(false)
+    val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
 
     init {
         loadDataEntry()
     }
 
-    private fun loadDataEntry() {
+    fun loadDataEntry() {
         viewModelScope.launch {
             try {
-                repository.getDataEntryForm(datasetId)
-                    .combine(
-                        if (isExistingEntry()) {
-                            repository.getExistingDataValues(
-                                datasetId,
-                                periodId!!,
-                                orgUnitId!!,
-                                attributeOptionComboId!!
-                            )
-                        } else {
-                            flow { emit(emptyList()) }
-                        }
-                    ) { formSections, existingValues ->
-                        mergeSectionsWithValues(formSections, existingValues)
+                _uiState.value = DataEntryState.Loading
+
+                val formFlow = getDataEntryFormUseCase(datasetId)
+                val valuesFlow = if (isExistingEntry()) {
+                    getExistingDataValuesUseCase(
+                        datasetId,
+                        periodId!!,
+                        orgUnitId!!,
+                        attributeOptionComboId!!
+                    )
+                } else {
+                    flow { emit(emptyList<DataValue>()) }
+                }
+
+                formFlow.combine(valuesFlow) { sections, values ->
+                    val mergedSections = mergeSectionsWithValues(sections, values)
+
+                    // Initialize first section as expanded
+                    if (mergedSections.isNotEmpty() && _expandedSections.value.isEmpty()) {
+                        _expandedSections.value = setOf(mergedSections.first().uid)
                     }
-                    .collect { sections ->
-                        _uiState.value = DataEntryState.Success(sections)
-                    }
+
+                    // Store original values for reset functionality
+                    val originalValueMap = values.associate { it.dataElementId to it.value }
+                    _originalValues.value = originalValueMap
+                    _dataValues.value = originalValueMap.toMutableMap()
+
+                    DataEntryState.Success(mergedSections)
+                }.catch { e ->
+                    _uiState.value = DataEntryState.Error(e.message ?: "Unknown error occurred")
+                }.collect {
+                    _uiState.value = it
+                    _hasUnsavedChanges.value = false
+                }
             } catch (e: Exception) {
                 _uiState.value = DataEntryState.Error(e.message ?: "Unknown error occurred")
             }
@@ -185,19 +106,19 @@ class DataEntryViewModel @Inject constructor(
     }
 
     private fun isExistingEntry(): Boolean =
-        periodId != null && orgUnitId != null && attributeOptionComboId != null
+        !periodId.isNullOrEmpty() && !orgUnitId.isNullOrEmpty() && !attributeOptionComboId.isNullOrEmpty()
 
     private fun mergeSectionsWithValues(
         sections: List<DataEntrySection>,
-        existingValues: List<DataValue>
+        values: List<DataValue>
     ): List<DataEntrySection> {
+        val valueMap = values.associateBy { it.dataElementId }
+
         return sections.map { section ->
             section.copy(
                 dataElements = section.dataElements.map { element ->
                     element.copy(
-                        value = existingValues.find {
-                            it.dataElementId == element.dataElementId
-                        }?.value ?: ""
+                        value = valueMap[element.dataElementId]?.value ?: ""
                     )
                 }
             )
@@ -214,10 +135,14 @@ class DataEntryViewModel @Inject constructor(
 
     fun updateDataValue(elementId: String, value: String) {
         _dataValues.value = _dataValues.value + (elementId to value)
-        updateSection(elementId, value)
+        _hasUnsavedChanges.value = _dataValues.value != _originalValues.value
+        updateSectionWithValue(elementId, value)
+
+        // Validate the field immediately
+        validateField(elementId, value)
     }
 
-    private fun updateSection(elementId: String, value: String) {
+    private fun updateSectionWithValue(elementId: String, value: String) {
         val currentState = _uiState.value
         if (currentState is DataEntryState.Success) {
             _uiState.value = DataEntryState.Success(
@@ -236,30 +161,79 @@ class DataEntryViewModel @Inject constructor(
         }
     }
 
-    fun saveDataEntry() {
+    private fun validateField(elementId: String, value: String) {
+        val currentErrors = _validationErrors.value.filter { it.elementId != elementId }
+
+        val newErrors = validateDataEntryUseCase.validateField(elementId, value)
+
+        _validationErrors.value = currentErrors + newErrors
+    }
+
+    fun validateAndSave(onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                if (isExistingEntry()) {
-                    repository.updateDataValues(
+                val allErrors = validateDataEntryUseCase(_dataValues.value)
+
+                if (allErrors.isEmpty()) {
+                    val requiredPeriodId = periodId ?: generatePeriodId()
+                    val requiredOrgUnitId = orgUnitId ?: getCurrentOrgUnitId()
+                    val requiredAttributeOptionComboId = attributeOptionComboId ?: getDefaultAttributeOptionComboId()
+
+                    saveDataEntryUseCase(
                         datasetId,
-                        periodId!!,
-                        orgUnitId!!,
-                        attributeOptionComboId!!,
-                        _dataValues.value
+                        requiredPeriodId,
+                        requiredOrgUnitId,
+                        requiredAttributeOptionComboId,
+                        _dataValues.value,
+                        isNewEntry = !isExistingEntry()
                     )
+
+                    _hasUnsavedChanges.value = false
+                    _originalValues.value = _dataValues.value
+                    onSuccess()
                 } else {
-                    repository.createDataEntry(
-                        datasetId,
-                        periodId!!,
-                        orgUnitId!!,
-                        attributeOptionComboId!!,
-                        _dataValues.value
-                    )
+                    _validationErrors.value = allErrors
+                    onError("Please fix validation errors before saving")
                 }
-                // Handle success (e.g., show snackbar, navigate back)
             } catch (e: Exception) {
-                // Handle error
+                onError(e.message ?: "Unknown error occurred")
             }
         }
+    }
+
+    fun resetToOriginalValues() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState is DataEntryState.Success) {
+                // Update UI with original values
+                _uiState.value = DataEntryState.Success(
+                    mergeSectionsWithValues(
+                        currentState.sections,
+                        _originalValues.value.map { (id, value) -> DataValue(id, value) }
+                    )
+                )
+
+                // Reset data values
+                _dataValues.value = _originalValues.value.toMap()
+                _hasUnsavedChanges.value = false
+                _validationErrors.value = emptyList()
+            }
+        }
+    }
+
+    private fun generatePeriodId(): String {
+        // Implementation depends on your period generation logic
+        val sdf = SimpleDateFormat("yyyyMMdd", Locale.US)
+        return sdf.format(Date())
+    }
+
+    private fun getCurrentOrgUnitId(): String {
+        // Implementation depends on how you determine the current org unit
+        throw IllegalStateException("Organization unit ID is required")
+    }
+
+    private fun getDefaultAttributeOptionComboId(): String {
+        // Implementation depends on your default attribute option combo logic
+        throw IllegalStateException("Attribute option combo ID is required")
     }
 }

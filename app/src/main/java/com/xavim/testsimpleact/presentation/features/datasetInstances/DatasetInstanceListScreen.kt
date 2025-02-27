@@ -1,7 +1,13 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.xavim.testsimpleact.presentation.features.datasetInstances
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -20,25 +26,36 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import com.xavim.testsimpleact.domain.model.DatasetInstance
 import org.hisp.dhis.mobile.ui.designsystem.component.AdditionalInfoItem
 import org.hisp.dhis.mobile.ui.designsystem.component.ListCard
 import org.hisp.dhis.mobile.ui.designsystem.component.ListCardTitleModel
 import org.hisp.dhis.mobile.ui.designsystem.component.state.rememberAdditionalInfoColumnState
 import org.hisp.dhis.mobile.ui.designsystem.component.state.rememberListCardState
+import java.text.SimpleDateFormat
+import java.util.Locale
 import androidx.compose.material3.Text as Text
 
 @Composable
 fun DatasetInstanceListScreen(
     viewModel: DatasetInstanceListViewModel = hiltViewModel(),
-    onNewEntryClick: () -> Unit,
-    onEntryClick: (String, String, String) -> Unit,
+    onNewEntryClick: (String) -> Unit,
+    onEntryClick: (String, String, String, String) -> Unit,
     onNavigateBack: () -> Unit,
     datasetId: String
 ) {
     val state by viewModel.state.collectAsState()
-    val datasetId = viewModel.datasetId
+    val sortOrder by viewModel.sortOrder.collectAsState()
+    val refreshing by viewModel.isRefreshing.collectAsState()
 
     Scaffold(
         topBar = {
@@ -48,195 +65,162 @@ fun DatasetInstanceListScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.updateSortOrder(getSortOrderToggle(sortOrder)) }) {
+                        Icon(
+                            imageVector = when(sortOrder) {
+                                DatasetInstanceListViewModel.SortOrder.DATE_DESC -> Icons.Default.ArrowDownward
+                                DatasetInstanceListViewModel.SortOrder.DATE_ASC -> Icons.Default.ArrowUpward
+                                DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS -> Icons.Default.Done
+                            },
+                            contentDescription = "Sort"
+                        )
+                    }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onNewEntryClick() }) {
-                Icon(Icons.Default.Add, contentDescription = "New Entry")
+            if ((state as? DatasetInstanceListState.Success)?.canCreateNew == true) {
+                FloatingActionButton(onClick = { onNewEntryClick(datasetId) }) {
+                    Icon(Icons.Default.Add, contentDescription = "New Entry")
+                }
             }
         }
     ) { paddingValues ->
-        when (val currentState = state) {
-
-            is DatasetInstanceListState.Loading -> {
-                /**
-                 * Instead of a custom LoadingIndicator(), use the built-in Compose CircularProgressIndicator().
-                 */
-                CircularProgressIndicator(modifier = Modifier.padding(paddingValues))
-            }
-
-            is DatasetInstanceListState.Success -> {
-                val entries = currentState.entries
-                /**
-                 * Instead of custom EmptyState(), display a simple Text
-                 * when there are no entries to show.
-                 */
-                if (entries.isEmpty()) {
-                    Text(
-                        text = "No entries found.",
-                        modifier = Modifier.padding(paddingValues).padding(16.dp)
-                    )
-                } else {
-                    /**
-                     * Replace DataEntryListLazyColumn() with a standard LazyColumn,
-                     * and use items() from LazyColumn to iterate over the list.
-                     */
-                    LazyColumn(
-                        modifier = Modifier.padding(paddingValues),
-                        contentPadding = PaddingValues(16.dp)
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(refreshing),
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            when (val currentState = state) {
+                is DatasetInstanceListState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        items(currentState.entries.size) { index ->
-                            val datasetInstance = currentState.entries[index]
-                            val additionalInfoList = listOf(
-                                AdditionalInfoItem(value = "Period Type: ${datasetInstance.dataSetUid}"),
-                                AdditionalInfoItem(value = "Category Combo: ${datasetInstance.organisationUnitUid}")
-                            )
-                            val listCardState = rememberListCardState(
-                                title = ListCardTitleModel(text = datasetInstance.periodId),
-                                additionalInfoColumnState = rememberAdditionalInfoColumnState(
-                                    additionalInfoList = additionalInfoList,
-                                    syncProgressItem = AdditionalInfoItem(value = "sync progress")
-                                )
-                            )
-                            ListCard(
-                                listCardState = listCardState,
-                                onCardClick = {
-                                    onEntryClick(
-                                        datasetInstance.periodId,
-                                        datasetInstance.organisationUnitUid,
-                                        datasetInstance.attributeOptionComboUid
-                                    )
+                        CircularProgressIndicator()
+                    }
+                }
+
+                is DatasetInstanceListState.Success -> {
+                    val entries = currentState.entries
+                    if (entries.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text("No data entries found")
+                                Button(onClick = { viewModel.refresh() }) {
+                                    Text("Refresh")
                                 }
-                            )
+                            }
                         }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp)
+                        ) {
+                            items(entries.size) { instance ->
+                                InstanceListItem(
+                                    instance = instance,
+                                    onClick = {
+                                        onEntryClick(
+                                            datasetId,
+                                            instance.periodId,
+                                            instance.organisationUnitUid,
+                                            instance.attributeOptionComboUid
+                                        )
+                                    },
+                                    onSyncClick = {
+                                        viewModel.syncInstance(instance.instanceUid.toString())
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
 
-
+                is DatasetInstanceListState.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = currentState.message,
+                                color = Color.Red
+                            )
+                            Button(onClick = { viewModel.refresh() }) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
             }
-
-            is DatasetInstanceListState.Error -> {
-                /**
-                 * Instead of ErrorMessage(), display a simple Text with the error message.
-                 */
-                Text(
-                    text = "Error: ${currentState.message}",
-                    modifier = Modifier.padding(paddingValues).padding(16.dp)
-                )
-            }
-
-
-
         }
     }
 }
 
+@Composable
+private fun InstanceListItem(
+    instance: DatasetInstance,
+    onClick: () -> Unit,
+    onSyncClick: () -> Unit
+) {
+    ListCard(
+        listCardState = rememberListCardState(
+            title = ListCardTitleModel(
+                text = instance.periodId,
+                style = MaterialTheme.typography.titleMedium
+            ),
+            additionalInfoColumnState = rememberAdditionalInfoColumnState(
+                additionalInfoList = listOf(
+                    AdditionalInfoItem(value = "Organization Unit: ${instance.organisationUnitUid}"),
+                    AdditionalInfoItem(
+                        value = "Status: ${if (instance.state) "Completed" else "In Progress"}",
+                        style = TextStyle(
+                            color = if (instance.state)
+                                Color.Cyan
+                            else
+                                Color.Gray
+                        )
+                    ),
+                    AdditionalInfoItem(value = "Last Updated: ${formatDate(instance.lastUpdated)}")
+                ),
+                syncProgressItem = TODO(),
+                expandLabelText = TODO(),
+                shrinkLabelText = TODO(),
+                minItemsToShow = TODO(),
+                scrollableContent = TODO()
+            )
+        ),
+        onCardClick = onClick
+    )
+}
 
-////                        { entries ->
-////                            /**
-////                             * Instead of a custom DataEntryItem(),
-////                             * we’ll just print each entry as text for clarity.
-////                             * You can replace with your own Card or Row implementation if needed.
-////                             */
-////                            Text(
-////                                text = "Period: ${entry.periodId}, OrgUnit: ${entry.organisationUnitUid}",
-////                                modifier = Modifier
-////                                    .padding(vertical = 8.dp)
-////                                    .padding(horizontal = 4.dp)
-////                            )
-////                            /**
-////                             * If you need a click, you can wrap the row in something clickable
-////                             * or call a lambda:
-////                             * onClick: { onEntryClick(datasetId, entry.dataSetUid) }
-////                             */
-////                        }
-//                    }
-//                }
-//            }
-//
-//            /**
-//             * The compiler complaint was about a missing "Error" branch,
-//             * or that the 'when' was not exhaustive. So we do:
-//             */
-//            is DatasetInstanceListState.Error -> {
-//                /**
-//                 * Instead of ErrorMessage(), display a simple Text with the error message.
-//                 */
-//                Text(
-//                    text = "Error: ${currentState.message}",
-//                    modifier = Modifier.padding(paddingValues).padding(16.dp)
-//                )
-//            }
-//        }
-//    }
-//}
+private fun formatDate(dateString: String): String {
+    return try {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+        val outputFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US)
+        val date = inputFormat.parse(dateString)
+        outputFormat.format(date)
+    } catch (e: Exception) {
+        dateString
+    }
+}
 
-//@Composable
-//fun DatasetInstanceListScreen(
-//    viewModel: DatasetInstanceListViewModel = hiltViewModel(),
-//    onNewEntryClick: () -> Unit,
-//    onEntryClick: (String, String, String) -> Unit, // Updated signature
-//    onNavigateBack: () -> Unit,
-//    datasetId: String
-//) {
-//    // ... existing code ...
-//
-//
-//
-//
-//    LazyColumn(
-//        modifier = Modifier.padding(paddingValues),
-//        contentPadding = PaddingValues(16.dp)
-//    ) {
-//        items(currentState.entries) { datasetInstance ->
-//            val additionalInfoList = listOf(
-//                AdditionalInfoItem(value = "Period: ${datasetInstance.periodId}"),
-//                AdditionalInfoItem(value = "Organization Unit: ${datasetInstance.organisationUnitUid}"),
-//                AdditionalInfoItem(value = "Status: ${if (datasetInstance.state) "Completed" else "In Progress"}")
-//            )
-//
-//            ListCard(
-//                listCardState = rememberListCardState(
-//                    title = ListCardTitleModel(text = datasetInstance.periodId),
-//                    additionalInfoColumnState = rememberAdditionalInfoColumnState(
-//                        additionalInfoList = additionalInfoList
-//                    )
-//                ),
-//                onCardClick = {
-//                    onEntryClick(
-//                        datasetInstance.periodId,
-//                        datasetInstance.organisationUnitUid,
-//                        datasetInstance.attributeOptionComboUid
-//                    )
-//                }
-//            )
-//        }
-//    }
-//}
-
-
-
-//LazyColumn(
-//                        modifier = Modifier.padding(paddingValues),
-//                        contentPadding = PaddingValues(16.dp)
-//                    ) {
-//                        items(currentState.entries.size) { index ->
-//                            val datasetInstance = currentState.entries[index]
-//                            val additionalInfoList = listOf(
-//                                AdditionalInfoItem(value = "Period Type: ${datasetInstance.dataSetUid}"),
-//                                AdditionalInfoItem(value = "Category Combo: ${datasetInstance.organisationUnitUid}")
-//                            )
-//                            val listCardState = rememberListCardState(
-//                                title = ListCardTitleModel(text = datasetInstance.periodId),
-//                                additionalInfoColumnState = rememberAdditionalInfoColumnState(
-//                                    additionalInfoList = additionalInfoList,
-//                                    syncProgressItem = AdditionalInfoItem(value = "sync progress")
-//                                )
-//                            )
-//                            ListCard(
-//                                listCardState = listCardState,
-//                                onCardClick = { onEntryClick(datasetInstance.periodId, datasetInstance.organisationUnitUid, datasetInstance.attributeOptionComboUid)
-//                                }
-//                            )
-//                        }
+private fun getSortOrderToggle(current: DatasetInstanceListViewModel.SortOrder): DatasetInstanceListViewModel.SortOrder {
+    return when (current) {
+        DatasetInstanceListViewModel.SortOrder.DATE_DESC -> DatasetInstanceListViewModel.SortOrder.DATE_ASC
+        DatasetInstanceListViewModel.SortOrder.DATE_ASC -> DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS
+        DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS -> DatasetInstanceListViewModel.SortOrder.DATE_DESC
+    }
+}

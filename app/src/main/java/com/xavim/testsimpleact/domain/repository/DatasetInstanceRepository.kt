@@ -5,18 +5,10 @@ import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
 
-//interface DatasetInstanceRepository {
-//    /**
-//     * Returns a flow of all dataset instances for a given dataset ID.
-//     */
-//    suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>>
-//}
-
 interface DatasetInstanceRepository {
     suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>>
     suspend fun getDatasetMetadata(datasetId: String): Flow<DatasetMetadata>
-//    suspend fun deleteInstance(instanceId: String)
-//    suspend fun syncInstance(instanceId: String)
+    //suspend fun syncInstance(instanceId: String)
 }
 
 data class DatasetMetadata(
@@ -27,3 +19,4 @@ data class DatasetMetadata(
     val canCreateNew: Boolean,
     val lastSync: Date?
 )
+

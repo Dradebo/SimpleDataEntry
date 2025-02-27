@@ -4,7 +4,6 @@ import com.xavim.testsimpleact.domain.model.DatasetInstance
 import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
 import com.xavim.testsimpleact.domain.repository.DatasetMetadata
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
@@ -14,94 +13,35 @@ import org.hisp.dhis.android.core.dataset.DataSetInstance
 import org.hisp.dhis.android.core.organisationunit.OrganisationUnit
 import javax.inject.Inject
 
-//class DatasetInstanceRepositoryImpl(
-//    private val d2: D2
-//) : DatasetInstanceRepository {
-//
-//    /**
-//     * Retrieves all “instances” of a particular dataset from DHIS2.
-//     * For demonstration, we interpret an instance as each unique (dataset, period, orgUnit, attributeOptionCombo).
-//     */
-//    override suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>> = flow {
-//
-////        val instances = d2.dataSetModule().dataSetInstances().byDataSetUid().eq(datasetId)
-////            .blockingGet().map { it.toDomainModel() }
-//
-//
-////      Prospective solution
-//        val datasetUid = datasetId
-//        val userOrgUnits = d2.organisationUnitModule().organisationUnits()
-//            .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
-//            .blockingGet()
-//        val userOrgUnitUid = userOrgUnits.firstOrNull()?.uid()
-//
-//        val instances = d2.dataSetModule().dataSetInstances()
-//            .byDataSetUid().eq(datasetUid)
-//            .byOrganisationUnitUid().eq(userOrgUnitUid)
-//            .blockingGet().map { it.toDomainModel() }
-//
-//
-//        emit(instances)
-//    }
-//}
-//
-//fun DataSetInstance.toDomainModel(): DatasetInstance {
-//    return DatasetInstance(
-//        dataSetUid = dataSetUid(),
-//        periodId = period(),
-//        organisationUnitUid = organisationUnitUid(),
-//        attributeOptionComboUid = attributeOptionComboUid(),
-//        state = completed(),
-//        instanceUid = id(),
-//        lastUpdated = lastUpdated().toString(),
-//    )
-//}
-
 class DatasetInstanceRepositoryImpl @Inject constructor(
     private val d2: D2,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher
 ) : DatasetInstanceRepository {
 
-//    override suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>> = flow {
-//        withContext(dispatcher) {
-//            try {
-//
-//                val instances = d2.dataSetModule().dataSetInstances()
-//                        .byDataSetUid().eq(datasetId)
-//
-//                        .blockingGet()
-//                .map { it.toDomainModel() }
-//
-//                emit(instances)
-//            } catch (e: Exception) {
-//                throw DatasetInstanceRepositoryException(
-//                    "Failed to fetch dataset instances",
-//                    e
-//                )
-//            }
-//        }
-//    }
-
     override suspend fun getDatasetInstances(datasetId: String): Flow<List<DatasetInstance>> = flow {
+        withContext(dispatcher) {
+            try {
+                val userOrgUnits = d2.organisationUnitModule().organisationUnits()
+                    .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
+                    .blockingGet()
 
-//        val instances = d2.dataSetModule().dataSetInstances().byDataSetUid().eq(datasetId)
-//            .blockingGet().map { it.toDomainModel() }
+                val instances = mutableListOf<DatasetInstance>()
 
+                for (orgUnit in userOrgUnits) {
+                    val orgUnitInstances = d2.dataSetModule().dataSetInstances()
+                        .byDataSetUid().eq(datasetId)
+                        .byOrganisationUnitUid().eq(orgUnit.uid())
+                        .blockingGet()
+                        .map { it.toDomainModel() }
 
-//      Prospective solution
-        val datasetUid = datasetId
-        val userOrgUnits = d2.organisationUnitModule().organisationUnits()
-            .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
-            .blockingGet()
-        val userOrgUnitUid = userOrgUnits.firstOrNull()?.uid()
+                    instances.addAll(orgUnitInstances)
+                }
 
-        val instances = d2.dataSetModule().dataSetInstances()
-            .byDataSetUid().eq(datasetUid)
-            .byOrganisationUnitUid().eq(userOrgUnitUid)
-            .blockingGet().map { it.toDomainModel() }
-
-
-        emit(instances)
+                emit(instances)
+            } catch (e: Exception) {
+                throw DatasetRepositoryException("Failed to fetch dataset instances", e)
+            }
+        }
     }
 
     override suspend fun getDatasetMetadata(datasetId: String): Flow<DatasetMetadata> = flow {
@@ -122,54 +62,41 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
 
                 emit(metadata)
             } catch (e: Exception) {
-                throw DatasetInstanceRepositoryException(
-                    "Failed to fetch dataset metadata",
-                    e
-                )
+                throw DatasetRepositoryException("Failed to fetch dataset metadata", e)
             }
         }
     }
 
-//    override suspend fun deleteInstance(instanceId: String) {
-//        withContext(dispatcher) {
-//            try {
-//                d2.dataSetModule().dataSetInstances()
-//                    .uid(instanceId)
-//                    .blockingDelete()
-//            } catch (e: Exception) {
-//                throw DatasetInstanceRepositoryException(
-//                    "Failed to delete dataset instance",
-//                    e
-//                )
-//            }
-//        }
-//    }
+
 
 //    override suspend fun syncInstance(instanceId: String) {
 //        withContext(dispatcher) {
 //            try {
+//                // Implementation depends on the D2 SDK capabilities
 //                d2.dataSetModule().dataSetInstances()
-//                    .uid(instanceId)
+//                    .byDataSetUid().eq(instanceId)
 //                    .blockingSync()
+//
+//                d2.dataSetModule().dataSetInstances()
+//                    .byDataSetUid().eq("dataSetUid")
+//                    .byPeriod().eq("period")
+//                    .byOrganisationUnitUid().eq("orgUnitUid")
+//                    .upload()
+//                    .subscribe(
+//                        {},
+//                        { error -> }
+//                    )
 //            } catch (e: Exception) {
-//                throw DatasetInstanceRepositoryException(
-//                    "Failed to sync dataset instance",
-//                    e
-//                )
+//                throw DatasetRepositoryException("Failed to sync dataset instance", e)
 //            }
 //        }
 //    }
 
     private fun checkCanCreateNew(dataset: DataSet?): Boolean {
-        return try {
-            // Add your business logic here
-            // For example: check user permissions, dataset configuration, etc.
-            true
-        } catch (e: Exception) {
-            false
-        }
+        // Logic to determine if a new instance can be created
+        // This could check permissions, expiration dates, etc.
+        return true
     }
-
 }
 
 fun DataSetInstance.toDomainModel(): DatasetInstance {
@@ -179,12 +106,9 @@ fun DataSetInstance.toDomainModel(): DatasetInstance {
         organisationUnitUid = organisationUnitUid(),
         attributeOptionComboUid = attributeOptionComboUid(),
         state = completed(),
-        instanceUid = id(),
         lastUpdated = lastUpdated().toString(),
+        instanceUid = id()
     )
 }
 
-class DatasetInstanceRepositoryException(
-    message: String,
-    cause: Throwable? = null
-) : Exception(message, cause)
+class DatasetRepositoryException(message: String, cause: Throwable? = null) : Exception(message, cause)
