@@ -1,21 +1,16 @@
 package com.xavim.testsimpleact.presentation.features.dataEntry
 
-import android.content.ContentValues.TAG
+import CreateNewEntryUseCase
+import GetDataEntryFormUseCase
+import GetExistingDataValuesUseCase
+import SaveDataEntryUseCase
+import ValidateDataEntryUseCase
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xavim.testsimpleact.domain.model.DataEntryElement
 import com.xavim.testsimpleact.domain.model.DataEntrySection
-import com.xavim.testsimpleact.domain.model.DataValue
 import com.xavim.testsimpleact.domain.model.ValidationError
-import com.xavim.testsimpleact.domain.repository.DataEntryRepository
-import com.xavim.testsimpleact.domain.repository.Logger
-import com.xavim.testsimpleact.domain.useCase.CreateNewEntryUseCase
-import com.xavim.testsimpleact.domain.useCase.GetDataEntryFormUseCase
-import com.xavim.testsimpleact.domain.useCase.GetExistingDataValuesUseCase
-import com.xavim.testsimpleact.domain.useCase.SaveDataEntryUseCase
-import com.xavim.testsimpleact.domain.useCase.ValidateDataEntryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +19,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
+
+
 
 @HiltViewModel
 class DataEntryViewModel @Inject constructor(
@@ -35,28 +29,39 @@ class DataEntryViewModel @Inject constructor(
     private val getExistingDataValuesUseCase: GetExistingDataValuesUseCase,
     private val saveDataEntryUseCase: SaveDataEntryUseCase,
     private val validateDataEntryUseCase: ValidateDataEntryUseCase,
+    private val createNewEntryUseCase: CreateNewEntryUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    // Navigation arguments
     private val datasetId: String = checkNotNull(savedStateHandle[DataEntryScreen.DATASET_ID_KEY])
     private val periodId: String? = savedStateHandle[DataEntryScreen.PERIOD_ID_KEY]
     private val orgUnitId: String? = savedStateHandle[DataEntryScreen.ORG_UNIT_ID_KEY]
     private val attributeOptionComboId: String? = savedStateHandle[DataEntryScreen.ATTRIBUTE_OPTION_COMBO_ID_KEY]
 
+    // UI state
     private val _uiState = MutableStateFlow<DataEntryState>(DataEntryState.Loading)
     val uiState: StateFlow<DataEntryState> = _uiState.asStateFlow()
 
+    // Section expansion state
     private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
     val expandedSections: StateFlow<Set<String>> = _expandedSections.asStateFlow()
 
-    private val _dataValues = MutableStateFlow<Map<String, String>>(emptyMap())
-    private val _originalValues = MutableStateFlow<Map<String, String>>(emptyMap())
-
+    // Validation errors
     private val _validationErrors = MutableStateFlow<List<ValidationError>>(emptyList())
     val validationErrors: StateFlow<List<ValidationError>> = _validationErrors.asStateFlow()
 
+    // Track unsaved changes
     private val _hasUnsavedChanges = MutableStateFlow(false)
     val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
+    // Store values for data elements and their category option combos
+    private val _dataValues = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val _originalValues = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    // Track expanded category option combos within sections
+    private val _expandedCategoryOptionComboSections = MutableStateFlow<Set<String>>(emptySet())
+    val expandedCategoryOptionComboSections: StateFlow<Set<String>> = _expandedCategoryOptionComboSections.asStateFlow()
 
     init {
         loadDataEntry()
@@ -76,30 +81,38 @@ class DataEntryViewModel @Inject constructor(
                         attributeOptionComboId!!
                     )
                 } else {
-                    flow { emit(emptyList<DataValue>()) }
+                    flow { emit(emptyList()) }
                 }
 
+                // Combine form structure with values
                 formFlow.combine(valuesFlow) { sections, values ->
-                    val mergedSections = mergeSectionsWithValues(sections, values)
+                    // Convert values to a map for easier lookup
+                    val valueMap = values.associate {
+                        "${it.dataElementId}_${it.categoryOptionComboId}" to it.value
+                    }
 
-                    // Initialize first section as expanded
+                    // Store original values
+                    _originalValues.value = valueMap
+                    _dataValues.value = valueMap.toMutableMap()
+
+                    // Update the UI model with values
+                    val mergedSections = mergeSectionsWithValues(sections, valueMap)
+
+                    // Initialize the first section as expanded by default
                     if (mergedSections.isNotEmpty() && _expandedSections.value.isEmpty()) {
                         _expandedSections.value = setOf(mergedSections.first().uid)
                     }
 
-                    // Store original values for reset functionality
-                    val originalValueMap = values.associate { it.dataElementId to it.value }
-                    _originalValues.value = originalValueMap
-                    _dataValues.value = originalValueMap.toMutableMap()
-
                     DataEntryState.Success(mergedSections)
                 }.catch { e ->
+                    Log.e( "Error loading data entry", e.toString())
                     _uiState.value = DataEntryState.Error(e.message ?: "Unknown error occurred")
                 }.collect {
                     _uiState.value = it
                     _hasUnsavedChanges.value = false
                 }
             } catch (e: Exception) {
+                Log.e("Error in loadDataEntry", e.toString())
                 _uiState.value = DataEntryState.Error(e.message ?: "Unknown error occurred")
             }
         }
@@ -110,15 +123,17 @@ class DataEntryViewModel @Inject constructor(
 
     private fun mergeSectionsWithValues(
         sections: List<DataEntrySection>,
-        values: List<DataValue>
+        valueMap: Map<String, String>
     ): List<DataEntrySection> {
-        val valueMap = values.associateBy { it.dataElementId }
-
         return sections.map { section ->
             section.copy(
                 dataElements = section.dataElements.map { element ->
+                    // For each data element, check all its category option combos for values
                     element.copy(
-                        value = valueMap[element.dataElementId]?.value ?: ""
+                        categoryOptionCombos = element.categoryOptionCombos.map { combo ->
+                            val key = "${element.dataElementId}_${combo.uid}"
+                            combo.copy(value = valueMap[key] ?: "")
+                        }
                     )
                 }
             )
@@ -133,24 +148,55 @@ class DataEntryViewModel @Inject constructor(
         }
     }
 
-    fun updateDataValue(elementId: String, value: String) {
-        _dataValues.value = _dataValues.value + (elementId to value)
-        _hasUnsavedChanges.value = _dataValues.value != _originalValues.value
-        updateSectionWithValue(elementId, value)
-
-        // Validate the field immediately
-        validateField(elementId, value)
+    fun toggleCategoryOptionComboSection(sectionKey: String) {
+        _expandedCategoryOptionComboSections.value = if (_expandedCategoryOptionComboSections.value.contains(sectionKey)) {
+            _expandedCategoryOptionComboSections.value - sectionKey
+        } else {
+            _expandedCategoryOptionComboSections.value + sectionKey
+        }
     }
 
-    private fun updateSectionWithValue(elementId: String, value: String) {
+    fun updateDataValue(
+        dataElementId: String,
+        categoryOptionComboId: String,
+        value: String
+    ) {
+        val key = "${dataElementId}_${categoryOptionComboId}"
+        val currentValues = _dataValues.value.toMutableMap()
+        currentValues[key] = value
+        _dataValues.value = currentValues
+
+        // Check if there are unsaved changes
+        _hasUnsavedChanges.value = _dataValues.value != _originalValues.value
+
+        // Update UI state to reflect the new value
+        updateSectionWithValue(dataElementId, categoryOptionComboId, value)
+
+        // Validate the field immediately
+        validateField(dataElementId, value)
+    }
+
+    private fun updateSectionWithValue(
+        dataElementId: String,
+        categoryOptionComboId: String,
+        value: String
+    ) {
         val currentState = _uiState.value
         if (currentState is DataEntryState.Success) {
             _uiState.value = DataEntryState.Success(
                 currentState.sections.map { section ->
                     section.copy(
                         dataElements = section.dataElements.map { element ->
-                            if (element.dataElementId == elementId) {
-                                element.copy(value = value)
+                            if (element.dataElementId == dataElementId) {
+                                element.copy(
+                                    categoryOptionCombos = element.categoryOptionCombos.map { combo ->
+                                        if (combo.uid == categoryOptionComboId) {
+                                            combo.copy(value = value)
+                                        } else {
+                                            combo
+                                        }
+                                    }
+                                )
                             } else {
                                 element
                             }
@@ -161,12 +207,12 @@ class DataEntryViewModel @Inject constructor(
         }
     }
 
-    private fun validateField(elementId: String, value: String) {
-        val currentErrors = _validationErrors.value.filter { it.elementId != elementId }
-
-        val newErrors = validateDataEntryUseCase.validateField(elementId, value)
-
-        _validationErrors.value = currentErrors + newErrors
+    private fun validateField(dataElementId: String, value: String) {
+        viewModelScope.launch {
+            val currentErrors = _validationErrors.value.filter { it.elementId != dataElementId }
+            val newErrors = validateDataEntryUseCase.validateField(dataElementId, value)
+            _validationErrors.value = currentErrors + newErrors
+        }
     }
 
     fun validateAndSave(onSuccess: () -> Unit, onError: (String) -> Unit) {
@@ -175,9 +221,10 @@ class DataEntryViewModel @Inject constructor(
                 val allErrors = validateDataEntryUseCase(_dataValues.value)
 
                 if (allErrors.isEmpty()) {
-                    val requiredPeriodId = periodId ?: generatePeriodId()
-                    val requiredOrgUnitId = orgUnitId ?: getCurrentOrgUnitId()
-                    val requiredAttributeOptionComboId = attributeOptionComboId ?: getDefaultAttributeOptionComboId()
+                    val requiredPeriodId = periodId ?: createNewEntryUseCase.generatePeriodId()
+                    val requiredOrgUnitId = orgUnitId ?: createNewEntryUseCase.getDefaultOrgUnitId()
+                    val requiredAttributeOptionComboId = attributeOptionComboId ?:
+                    createNewEntryUseCase.getDefaultAttributeOptionComboId()
 
                     saveDataEntryUseCase(
                         datasetId,
@@ -186,54 +233,52 @@ class DataEntryViewModel @Inject constructor(
                         requiredAttributeOptionComboId,
                         _dataValues.value,
                         isNewEntry = !isExistingEntry()
-                    )
-
-                    _hasUnsavedChanges.value = false
-                    _originalValues.value = _dataValues.value
-                    onSuccess()
+                    ).collect { result ->
+                        result.onSuccess {
+                            _hasUnsavedChanges.value = false
+                            _originalValues.value = _dataValues.value
+                            onSuccess()
+                        }.onFailure { error ->
+                            onError(error.message ?: "Error saving data")
+                        }
+                    }
                 } else {
                     _validationErrors.value = allErrors
                     onError("Please fix validation errors before saving")
                 }
             } catch (e: Exception) {
-                onError(e.message ?: "Unknown error occurred")
+                Log.e("Error in validateAndSave", e.toString())
+                onError(e.message ?: "Unknown error occurred while saving")
             }
         }
     }
 
     fun resetToOriginalValues() {
-        viewModelScope.launch {
-            val currentState = _uiState.value
-            if (currentState is DataEntryState.Success) {
-                // Update UI with original values
-                _uiState.value = DataEntryState.Success(
-                    mergeSectionsWithValues(
-                        currentState.sections,
-                        _originalValues.value.map { (id, value) -> DataValue(id, value) }
-                    )
-                )
+        _dataValues.value = _originalValues.value
+        _hasUnsavedChanges.value = false
+        refreshDataDisplay()
+    }
 
-                // Reset data values
-                _dataValues.value = _originalValues.value.toMap()
-                _hasUnsavedChanges.value = false
-                _validationErrors.value = emptyList()
-            }
+    private fun refreshDataDisplay() {
+        val currentState = _uiState.value
+        if (currentState is DataEntryState.Success) {
+            _uiState.value = DataEntryState.Success(
+                mergeSectionsWithValues(currentState.sections, _dataValues.value)
+            )
         }
     }
 
-    private fun generatePeriodId(): String {
-        // Implementation depends on your period generation logic
-        val sdf = SimpleDateFormat("yyyyMMdd", Locale.US)
-        return sdf.format(Date())
-    }
+    // Helper to determine if a data element has too many category options to display inline
+    fun shouldUseNestedAccordion(dataElementId: String): Boolean {
+        val currentState = _uiState.value
+        if (currentState is DataEntryState.Success) {
+            val element = currentState.sections
+                .flatMap { it.dataElements }
+                .find { it.dataElementId == dataElementId }
 
-    private fun getCurrentOrgUnitId(): String {
-        // Implementation depends on how you determine the current org unit
-        throw IllegalStateException("Organization unit ID is required")
-    }
-
-    private fun getDefaultAttributeOptionComboId(): String {
-        // Implementation depends on your default attribute option combo logic
-        throw IllegalStateException("Attribute option combo ID is required")
+            // If more than 5 category options, use nested accordion
+            return element?.categoryOptionCombos?.size ?: 0 > 5
+        }
+        return false
     }
 }

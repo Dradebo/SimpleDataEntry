@@ -9,6 +9,13 @@ import javax.inject.Inject
 class GetDatasetInstancesUseCase @Inject constructor(
     private val repository: DatasetInstanceRepository
 ) {
-    suspend operator fun invoke(datasetId: String): Flow<List<DatasetInstance>> =
-        repository.getDatasetInstances(datasetId)
+    operator fun invoke(
+        datasetId: String,
+        orgUnitId: String? = null,
+        periodId: String? = null,
+        state: DatasetInstanceState? = null,
+        syncState: SyncState? = null
+    ): Flow<List<DatasetInstance>> = repository.getDatasetInstances(
+        datasetId, orgUnitId, periodId, state, syncState
+    )
 }

@@ -1,148 +1,167 @@
-package com.xavim.testsimpleact.navigation
+package com.xavim.testsimpleact.presentation.navigation
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.xavim.testsimpleact.presentation.features.dataEntry.DataEntryScreen
+import com.xavim.testsimpleact.presentation.features.datasetInstances.DatasetInstanceDetailScreen
 import com.xavim.testsimpleact.presentation.features.datasetInstances.DatasetInstanceListScreen
 import com.xavim.testsimpleact.presentation.features.datasets.DatasetScreen
 import com.xavim.testsimpleact.presentation.features.login.LoginScreen
 
+
 sealed class Screen(val route: String) {
-    data object LoginScreen : Screen("login")  // Added login screen
-    data object FormScreen : Screen("forms")
-    data object DatasetScreen : Screen("datasets")
-    data class DatasetInstanceListScreen(val datasetId: String) : Screen("datasetInstanceList/{datasetId}") {
-        companion object {
-            const val DATASET_ID_KEY = "datasetId"
-            fun createRoute(datasetId: String) = "datasetInstanceList/$datasetId"
-        }
+    object Login : Screen("login")
+    object DatasetList : Screen("dataset_list")
+
+    object DatasetInstanceList : Screen("dataset_instances/{datasetId}") {
+        fun createRoute(datasetId: String) = "dataset_instances/$datasetId"
     }
 
-    data class DataEntryScreen(
-        val datasetId: String,
-        val periodId: String? = null,
-        val orgUnitId: String? = null,
-        val attributeOptionComboId: String? = null
-    ) : Screen("dataEntry/{datasetId}?periodId={periodId}&orgUnitId={orgUnitId}&attributeOptionComboId={attributeOptionComboId}") {
-        companion object {
-            const val DATASET_ID_KEY = "datasetId"
-            const val PERIOD_ID_KEY = "periodId"
-            const val ORG_UNIT_ID_KEY = "orgUnitId"
-            const val ATTRIBUTE_OPTION_COMBO_ID_KEY = "attributeOptionComboId"
-
-            fun createRoute(
-                datasetId: String,
-                periodId: String? = null,
-                orgUnitId: String? = null,
-                attributeOptionComboId: String? = null
-            ): String {
-                val params = listOfNotNull(
-                    periodId?.let { "periodId=$it" },
-                    orgUnitId?.let { "orgUnitId=$it" },
-                    attributeOptionComboId?.let { "attributeOptionComboId=$it" }
-                ).joinToString("&")
-                return "dataEntry/$datasetId" + if (params.isNotEmpty()) "?$params" else ""
-            }
-        }
+    object DatasetInstanceDetail : Screen(
+        "dataset_instance/{datasetId}/{periodId}/{orgUnitId}/{attributeOptionComboId}"
+    ) {
+        fun createRoute(
+            datasetId: String,
+            periodId: String,
+            orgUnitId: String,
+            attributeOptionComboId: String
+        ) = "dataset_instance/$datasetId/$periodId/$orgUnitId/$attributeOptionComboId"
     }
 
+    object DataEntry : Screen("data_entry") {
+        val routeForNewEntry = "data_entry/{datasetId}"
+        val routeForExistingEntry = "data_entry/{datasetId}/{periodId}/{orgUnitId}/{attributeOptionComboId}"
+
+        fun createRouteForNewEntry(datasetId: String) = "data_entry/$datasetId"
+
+        fun createRouteForExistingEntry(
+            datasetId: String,
+            periodId: String,
+            orgUnitId: String,
+            attributeOptionComboId: String
+        ) = "data_entry/$datasetId/$periodId/$orgUnitId/$attributeOptionComboId"
+    }
+}
 
 @Composable
-fun AppNavigation(
-    navController: NavHostController = rememberNavController(),
-    startDestination: String = route
-) {
+fun AppNavigation(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = Screen.Login.route
     ) {
-        composable(LoginScreen.route) {
+        // Login Screen
+        composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    // Clear back stack and navigate to datasets
-                    navController.navigate(DatasetScreen.route) {
-                        popUpTo(LoginScreen.route) {
-                            inclusive = true
-                        }
+                    navController.navigate(Screen.DatasetList.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(DatasetScreen.route) {
+        // Dataset List Screen
+        composable(Screen.DatasetList.route) {
             DatasetScreen(
                 onDatasetClick = { datasetId ->
-                    navController.navigate(DatasetInstanceListScreen.createRoute(datasetId.toString()))
+                    navController.navigate(Screen.DatasetInstanceList.createRoute(datasetId.toString()))
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.DatasetList.route) { inclusive = true }
+                    }
                 }
             )
         }
 
+        // Dataset Instance List Screen
         composable(
-            route = DatasetInstanceListScreen("").route,
-            arguments = listOf(navArgument(DatasetInstanceListScreen.DATASET_ID_KEY) {
-                type = NavType.StringType
-            })
+            route = Screen.DatasetInstanceList.route,
+            arguments = listOf(
+                navArgument("datasetId") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
-            val datasetId =
-                backStackEntry.arguments?.getString(DatasetInstanceListScreen.DATASET_ID_KEY)
-            datasetId?.let { nonNullDatasetId ->
-                DatasetInstanceListScreen(
-                    onNewEntryClick = { datasetId ->
-                        navController.navigate(
-                            DataEntryScreen.createRoute(datasetId)
+            val datasetId = backStackEntry.arguments?.getString("datasetId") ?: ""
+
+            DatasetInstanceListScreen(
+                datasetId = datasetId,
+                onNavigateBack = { navController.popBackStack() },
+                onItemClick = { datasetId, periodId, orgUnitId, attributeOptionComboId ->
+                    navController.navigate(
+                        Screen.DatasetInstanceDetail.createRoute(
+                            datasetId, periodId, orgUnitId, attributeOptionComboId
                         )
-                    },
-                    onEntryClick = { datasetId, periodId, orgUnitId, attributeOptionComboId ->
-                        navController.navigate(
-                            DataEntryScreen.createRoute(
-                                datasetId = datasetId,
-                                periodId = periodId,
-                                orgUnitId = orgUnitId,
-                                attributeOptionComboId = attributeOptionComboId
-                            )
-                        )
-                    },
-                    onNavigateBack = { navController.popBackStack() },
-                    datasetId = nonNullDatasetId
-                )
-            }
+                    )
+                },
+                onNewEntryClick = { datasetId ->
+                    navController.navigate(Screen.DataEntry.createRouteForNewEntry(datasetId))
+                }
+            )
         }
 
+        // Dataset Instance Detail Screen
         composable(
-            route = DataEntryScreen(datasetId = "").route,
+            route = Screen.DatasetInstanceDetail.route,
             arguments = listOf(
-                navArgument(DataEntryScreen.DATASET_ID_KEY) { type = NavType.StringType },
-                navArgument(DataEntryScreen.PERIOD_ID_KEY) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument(DataEntryScreen.ORG_UNIT_ID_KEY) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument(DataEntryScreen.ATTRIBUTE_OPTION_COMBO_ID_KEY) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
+                navArgument("datasetId") { type = NavType.StringType },
+                navArgument("periodId") { type = NavType.StringType },
+                navArgument("orgUnitId") { type = NavType.StringType },
+                navArgument("attributeOptionComboId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val datasetId = backStackEntry.arguments?.getString("datasetId") ?: ""
+            val periodId = backStackEntry.arguments?.getString("periodId") ?: ""
+            val orgUnitId = backStackEntry.arguments?.getString("orgUnitId") ?: ""
+            val attributeOptionComboId = backStackEntry.arguments?.getString("attributeOptionComboId") ?: ""
+
+            DatasetInstanceDetailScreen(
+                datasetId = datasetId,
+                periodId = periodId,
+                orgUnitId = orgUnitId,
+                attributeOptionComboId = attributeOptionComboId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDataEntry = { datasetId, periodId, orgUnitId, attributeOptionComboId ->
+                    navController.navigate(
+                        Screen.DataEntry.createRouteForExistingEntry(
+                            datasetId, periodId, orgUnitId, attributeOptionComboId
+                        )
+                    )
                 }
+            )
+        }
+
+        // Data Entry Screen - New Entry
+        composable(
+            route = Screen.DataEntry.routeForNewEntry,
+            arguments = listOf(
+                navArgument("datasetId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val datasetId = backStackEntry.arguments?.getString("datasetId") ?: ""
+
+            DataEntryScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Data Entry Screen - Existing Entry
+        composable(
+            route = Screen.DataEntry.routeForExistingEntry,
+            arguments = listOf(
+                navArgument("datasetId") { type = NavType.StringType },
+                navArgument("periodId") { type = NavType.StringType },
+                navArgument("orgUnitId") { type = NavType.StringType },
+                navArgument("attributeOptionComboId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             DataEntryScreen(
-                onNavigateBack = { navController.popBackStack() },
-                datasetId = TODO(),
-                periodId = TODO(),
-                orgUnitId = TODO(),
-                attributeOptionComboId = TODO()
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
 }
 
-}

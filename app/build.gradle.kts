@@ -57,6 +57,7 @@ dependencies {
     implementation("org.hisp.dhis:android-core:1.11.0")
     implementation("org.hisp.dhis.rules:rule-engine:2.0.48")
     implementation(libs.play.services.tflite.support)
+    implementation(libs.androidx.security.crypto.ktx)
 
 // Hilt
     val hiltVersion = "2.48"

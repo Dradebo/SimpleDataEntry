@@ -1,11 +1,5 @@
 package com.xavim.testsimpleact.presentation.features.dataEntry
 
-import android.annotation.SuppressLint
-import android.app.DatePickerDialog
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -15,68 +9,35 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.xavim.testsimpleact.domain.model.DataEntryElement
-import com.xavim.testsimpleact.domain.model.DataEntrySection
-import com.xavim.testsimpleact.domain.model.ValidationError
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import com.xavim.testsimpleact.domain.model.*
+import com.xavim.testsimpleact.presentation.core.DateInputField
+import com.xavim.testsimpleact.presentation.core.NumericInputField
+import com.xavim.testsimpleact.presentation.core.OptionSetField
+import com.xavim.testsimpleact.presentation.core.TextInputField
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+
+
+object DataEntryScreen {
+    const val DATASET_ID_KEY = "datasetId"
+    const val PERIOD_ID_KEY = "periodId"
+    const val ORG_UNIT_ID_KEY = "orgUnitId"
+    const val ATTRIBUTE_OPTION_COMBO_ID_KEY = "attributeOptionComboId"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +47,7 @@ fun DataEntryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val expandedSections by viewModel.expandedSections.collectAsState()
+    val expandedCategoryOptionComboSections by viewModel.expandedCategoryOptionComboSections.collectAsState()
     val validationErrors by viewModel.validationErrors.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
 
@@ -94,10 +56,12 @@ fun DataEntryScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showSaveSuccessMessage by remember { mutableStateOf(false) }
 
+    // Handle back navigation with unsaved changes
     BackHandler(enabled = hasUnsavedChanges) {
         showDiscardDialog = true
     }
 
+    // Discard changes dialog
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -204,11 +168,14 @@ fun DataEntryScreen(
                             section = section,
                             isExpanded = expandedSections.contains(section.uid),
                             onSectionClick = { viewModel.toggleSection(section.uid) },
-                            onValueChange = { elementId, value ->
-                                viewModel.updateDataValue(elementId, value)
+                            onCategoryOptionComboSectionClick = { viewModel.toggleCategoryOptionComboSection(it) },
+                            expandedCategoryOptionComboSections = expandedCategoryOptionComboSections,
+                            onValueChange = { dataElementId, categoryOptionComboId, value ->
+                                viewModel.updateDataValue(dataElementId, categoryOptionComboId, value)
                             },
-                            validationErrors = validationErrors.filter { error ->
-                                section.dataElements.any { it.dataElementId == error.elementId }
+                            validationErrors = validationErrors,
+                            shouldUseNestedAccordion = { dataElementId ->
+                                viewModel.shouldUseNestedAccordion(dataElementId)
                             }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -228,8 +195,8 @@ fun DataEntryScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = state.message
-                           // color = MaterialTheme.colors.error
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error
                         )
                         Button(onClick = { viewModel.loadDataEntry() }) {
                             Text("Retry")
@@ -246,24 +213,25 @@ private fun ValidationErrorsCard(errors: List<ValidationError>) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-        //backgroundColor = MaterialTheme.colors.error.copy(alpha = 0.1f),
-        //elevation =
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
                 text = "Please fix the following errors:",
-                //style = MaterialTheme.typography.subtitle1,
-                //color = MaterialTheme.colors.error
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(modifier = Modifier.height(8.dp))
             errors.forEach { error ->
                 Text(
                     text = "• ${error.message}",
-                    //style = MaterialTheme.typography.body2,
-                    //color = MaterialTheme.colors.error
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }
@@ -275,20 +243,31 @@ private fun DataEntrySection(
     section: DataEntrySection,
     isExpanded: Boolean,
     onSectionClick: () -> Unit,
-    onValueChange: (String, String) -> Unit,
-    validationErrors: List<ValidationError>
+    onCategoryOptionComboSectionClick: (String) -> Unit,
+    expandedCategoryOptionComboSections: Set<String>,
+    onValueChange: (String, String, String) -> Unit,
+    validationErrors: List<ValidationError>,
+    shouldUseNestedAccordion: (String) -> Boolean
 ) {
+    // Find errors related to this section
+    val sectionErrors = validationErrors.filter { error ->
+        section.dataElements.any { it.dataElementId == error.elementId }
+    }
+
+    // Determine if section has errors
+    val hasSectionErrors = sectionErrors.isNotEmpty()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        //elevation = 2.dp,
-        border = if (validationErrors.isNotEmpty())
-            BorderStroke(1.dp, color = Color.Red)
+        border = if (hasSectionErrors)
+            BorderStroke(1.dp, color = MaterialTheme.colorScheme.error)
         else
             null
     ) {
         Column {
+            // Section header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -302,11 +281,11 @@ private fun DataEntrySection(
                         text = section.name,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    if (validationErrors.isNotEmpty()) {
+                    if (hasSectionErrors) {
                         Text(
-                            text = "${validationErrors.size} error(s)",
+                            text = "${sectionErrors.size} error(s)",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.Red
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -316,6 +295,7 @@ private fun DataEntrySection(
                 )
             }
 
+            // Section content (only visible when expanded)
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = fadeIn() + expandVertically(),
@@ -331,11 +311,128 @@ private fun DataEntrySection(
                         )
                 ) {
                     section.dataElements.forEach { element ->
-                        val elementError = validationErrors.find { it.elementId == element.dataElementId }
-                        DataElementInput(
-                            element = element,
-                            onValueChange = { value -> onValueChange(element.dataElementId, value) },
-                            error = elementError
+                        // Get errors for this data element
+                        val elementErrors = validationErrors.filter { it.elementId == element.dataElementId }
+
+                        // Check if we should use a nested accordion for this element's category options
+                        if (shouldUseNestedAccordion(element.dataElementId)) {
+                            NestedCategoryOptionsAccordion(
+                                element = element,
+                                isExpanded = expandedCategoryOptionComboSections.contains(element.dataElementId),
+                                onToggleExpand = { onCategoryOptionComboSectionClick(element.dataElementId) },
+                                onValueChange = { categoryOptionComboId, value ->
+                                    onValueChange(element.dataElementId, categoryOptionComboId, value)
+                                },
+                                errors = elementErrors
+                            )
+                        } else {
+                            // If few category options, display them directly
+                            element.categoryOptionCombos.forEach { combo ->
+                                // For default category option combo, don't show its name
+                                val fieldLabel = if (combo.isDefault) element.name
+                                else "${element.name} - ${combo.name}"
+
+                                DataElementField(
+                                    dataElementId = element.dataElementId,
+                                    categoryOptionComboId = combo.uid,
+                                    label = fieldLabel,
+                                    value = combo.value,
+                                    valueType = element.valueType,
+                                    mandatory = element.mandatory,
+                                    optionSetUid = element.optionSetUid,
+                                    onValueChange = { value ->
+                                        onValueChange(element.dataElementId, combo.uid, value)
+                                    },
+                                    error = elementErrors.firstOrNull()?.message
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NestedCategoryOptionsAccordion(
+    element: DataEntryElement,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onValueChange: (String, String) -> Unit,
+    errors: List<ValidationError>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        border = if (errors.isNotEmpty())
+            BorderStroke(1.dp, color = MaterialTheme.colorScheme.error)
+        else
+            null
+    ) {
+        Column {
+            // Element header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleExpand)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = element.name,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    if (errors.isNotEmpty()) {
+                        Text(
+                            text = "${errors.size} error(s)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand"
+                )
+            }
+
+            // Category option combos (only visible when expanded)
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 12.dp,
+                            end = 12.dp,
+                            bottom = 12.dp
+                        )
+                ) {
+                    element.categoryOptionCombos.forEach { combo ->
+                        val fieldLabel = if (combo.isDefault) "" else combo.name
+
+                        DataElementField(
+                            dataElementId = element.dataElementId,
+                            categoryOptionComboId = combo.uid,
+                            label = fieldLabel,
+                            value = combo.value,
+                            valueType = element.valueType,
+                            mandatory = element.mandatory,
+                            optionSetUid = element.optionSetUid,
+                            onValueChange = { value ->
+                                onValueChange(combo.uid, value)
+                            },
+                            error = errors.firstOrNull()?.message
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -346,172 +443,54 @@ private fun DataEntrySection(
 }
 
 @Composable
-private fun DataElementInput(
-    element: DataEntryElement,
+private fun DataElementField(
+    dataElementId: String,
+    categoryOptionComboId: String,
+    label: String,
+    value: String,
+    valueType: DataElementValueType,
+    mandatory: Boolean,
+    optionSetUid: String? = null,
     onValueChange: (String) -> Unit,
-    error: ValidationError?
+    error: String? = null
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = element.name,
-            style = MaterialTheme.typography.titleSmall
-        )
+    val displayLabel = if (mandatory) "$label *" else label
 
-        when (element.type) {
-            "NUMBER" -> NumberInput(
-                value = element.value,
-                onValueChange = onValueChange,
-                error = error
-            )
-            "TEXT" -> TextInput(
-                value = element.value,
-                onValueChange = onValueChange,
-                error = error
-            )
-            "BOOLEAN" -> BooleanInput(
-                value = element.value,
-                onValueChange = onValueChange,
-                error = error
-            )
-            "DATE" -> DateInput(
-                value = element.value,
-                onValueChange = onValueChange,
-                error = error
-            )
-            // Add other input types as needed
-            else -> TextInput(
-                value = element.value,
+    when {
+        optionSetUid != null -> {
+            OptionSetField(
+                label = displayLabel,
+                value = value,
+                options = emptyList(), // This would need to be populated from ViewModel
                 onValueChange = onValueChange,
                 error = error
             )
         }
-
-        if (error != null) {
-            Text(
-                text = error.message,
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.Red,
-                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+        valueType == DataElementValueType.DATE || valueType == DataElementValueType.DATETIME -> {
+            DateInputField(
+                label = displayLabel,
+                value = value,
+                onValueChange = onValueChange,
+                error = error
             )
         }
-    }
-}
-
-@Composable
-private fun NumberInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    error: ValidationError?
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { newValue ->
-            if (newValue.isEmpty() || newValue.toDoubleOrNull() != null) {
-                onValueChange(newValue)
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        isError = error != null,
-        singleLine = true
-    )
-}
-
-@Composable
-private fun TextInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    error: ValidationError?
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        isError = error != null,
-        singleLine = true
-    )
-}
-
-@Composable
-private fun BooleanInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    error: ValidationError?
-) {
-    val isChecked = value.equals("true", ignoreCase = true)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = isChecked,
-            onCheckedChange = { checked ->
-                onValueChange(checked.toString())
-            }
-        )
-        Text(
-            text = if (isChecked) "Yes" else "No",
-            modifier = Modifier.padding(start = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun DateInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    error: ValidationError?
-) {
-    var showDatePicker by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-    val date = remember(value) {
-        try {
-            if (value.isNotEmpty()) dateFormatter.parse(value) else null
-        } catch (e: Exception) {
-            null
+        valueType.isNumeric -> {
+            NumericInputField(
+                label = displayLabel,
+                value = value,
+                onValueChange = onValueChange,
+                error = error,
+                valueType = valueType
+            )
         }
-    }
-
-    OutlinedTextField(
-        value = if (date != null) dateFormatter.format(date) else "",
-        onValueChange = { /* Read-only */ },
-        modifier = Modifier.fillMaxWidth(),
-        isError = error != null,
-        singleLine = true,
-        readOnly = true,
-        trailingIcon = {
-            IconButton(onClick = { showDatePicker = true }) {
-                Icon(Icons.Default.DateRange, contentDescription = "Pick date")
-            }
-        }
-    )
-
-    if (showDatePicker && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        val calendar = Calendar.getInstance()
-        date?.let { calendar.time = it }
-
-        val datePicker = DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                calendar.set(year, month, dayOfMonth)
-                onValueChange(dateFormatter.format(calendar.time))
-                showDatePicker = false
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        )
-
-        DisposableEffect(Unit) {
-            datePicker.show()
-            onDispose {
-                datePicker.dismiss()
-            }
+        else -> {
+            TextInputField(
+                label = displayLabel,
+                value = value,
+                onValueChange = onValueChange,
+                error = error,
+                multiline = valueType == DataElementValueType.LONG_TEXT
+            )
         }
     }
 }

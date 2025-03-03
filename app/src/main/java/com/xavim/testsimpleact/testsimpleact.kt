@@ -10,7 +10,8 @@ import javax.inject.Inject
 @HiltAndroidApp
 class testsimpleact: Application() {
 
-    @Inject lateinit var systemRepository: SystemRepository
+    @Inject
+    lateinit var systemRepository: SystemRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -18,7 +19,7 @@ class testsimpleact: Application() {
     }
 
     private fun initializeApp() {
-        // No longer blocking login here - just initialize D2
+        // Initialize D2 but don't block on login
         runBlocking {
             try {
                 systemRepository.initializeD2(this@testsimpleact)

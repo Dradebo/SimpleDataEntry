@@ -1,226 +1,460 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.xavim.testsimpleact.presentation.features.datasetInstances
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import com.xavim.testsimpleact.domain.model.DatasetInstance
-import org.hisp.dhis.mobile.ui.designsystem.component.AdditionalInfoItem
-import org.hisp.dhis.mobile.ui.designsystem.component.ListCard
-import org.hisp.dhis.mobile.ui.designsystem.component.ListCardTitleModel
-import org.hisp.dhis.mobile.ui.designsystem.component.state.rememberAdditionalInfoColumnState
-import org.hisp.dhis.mobile.ui.designsystem.component.state.rememberListCardState
+import com.xavim.testsimpleact.domain.model.DatasetInstanceState
+import com.xavim.testsimpleact.domain.model.SyncState
+import com.xavim.testsimpleact.presentation.core.EmptyState
+import com.xavim.testsimpleact.presentation.core.ErrorState
+import com.xavim.testsimpleact.presentation.core.LoadingState
 import java.text.SimpleDateFormat
-import java.util.Locale
-import androidx.compose.material3.Text as Text
+import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatasetInstanceListScreen(
+    datasetId: String,
     viewModel: DatasetInstanceListViewModel = hiltViewModel(),
-    onNewEntryClick: (String) -> Unit,
-    onEntryClick: (String, String, String, String) -> Unit,
     onNavigateBack: () -> Unit,
-    datasetId: String
+    onItemClick: (String, String, String, String) -> Unit,
+    onNewEntryClick: (String) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val datasetName by viewModel.datasetName.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
-    val refreshing by viewModel.isRefreshing.collectAsState()
+
+    var showFilterDialog by remember { mutableStateOf(false) }
+    var showSortDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "Data Entries") },
+                title = {
+                    Text(
+                        text = datasetName ?: "Dataset Instances",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.updateSortOrder(getSortOrderToggle(sortOrder)) }) {
-                        Icon(
-                            imageVector = when(sortOrder) {
-                                DatasetInstanceListViewModel.SortOrder.DATE_DESC -> Icons.Default.ArrowDownward
-                                DatasetInstanceListViewModel.SortOrder.DATE_ASC -> Icons.Default.ArrowUpward
-                                DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS -> Icons.Default.Done
-                            },
-                            contentDescription = "Sort"
-                        )
+                    IconButton(onClick = { showSortDialog = true }) {
+                        Icon(Icons.Default.Sort, contentDescription = "Sort")
+                    }
+                    IconButton(onClick = { showFilterDialog = true }) {
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                    }
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 }
             )
         },
         floatingActionButton = {
-            if ((state as? DatasetInstanceListState.Success)?.canCreateNew == true) {
-                FloatingActionButton(onClick = { onNewEntryClick(datasetId) }) {
-                    Icon(Icons.Default.Add, contentDescription = "New Entry")
-                }
+            FloatingActionButton(
+                onClick = { onNewEntryClick(datasetId) }
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add new entry")
             }
         }
     ) { paddingValues ->
-        SwipeRefresh(
-            state = rememberSwipeRefreshState(refreshing),
-            onRefresh = { viewModel.refresh() },
-            modifier = Modifier.padding(paddingValues)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
             when (val currentState = state) {
                 is DatasetInstanceListState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    LoadingState()
                 }
-
                 is DatasetInstanceListState.Success -> {
-                    val entries = currentState.entries
-                    if (entries.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Text("No data entries found")
-                                Button(onClick = { viewModel.refresh() }) {
-                                    Text("Refresh")
-                                }
-                            }
-                        }
+                    if (currentState.entries.isEmpty()) {
+                        EmptyState(
+                            message = "No dataset instances found",
+                            icon = Icons.Default.DataArray
+                        )
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp)
-                        ) {
-                            items(entries.size) { instance ->
-                                InstanceListItem(
-                                    instance = instance,
-                                    onClick = {
-                                        onEntryClick(
-                                            datasetId,
-                                            instance.periodId,
-                                            instance.organisationUnitUid,
-                                            instance.attributeOptionComboUid
-                                        )
-                                    },
-                                    onSyncClick = {
-                                        viewModel.syncInstance(instance.instanceUid.toString())
-                                    }
+                        DatasetInstanceList(
+                            instances = currentState.entries,
+                            onItemClick = { instance ->
+                                onItemClick(
+                                    instance.datasetId,
+                                    instance.periodId,
+                                    instance.organisationUnitUid,
+                                    instance.attributeOptionComboUid
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
                             }
-                        }
+                        )
                     }
                 }
-
                 is DatasetInstanceListState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Text(
-                                text = currentState.message,
-                                color = Color.Red
-                            )
-                            Button(onClick = { viewModel.refresh() }) {
-                                Text("Retry")
-                            }
-                        }
-                    }
+                    ErrorState(
+                        message = currentState.message,
+                        onRetry = { viewModel.refresh() }
+                    )
                 }
+            }
+
+            // Loading indicator
+            AnimatedVisibility(
+                visible = isRefreshing,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+    }
+
+    // Sort dialog
+    if (showSortDialog) {
+        AlertDialog(
+            onDismissRequest = { showSortDialog = false },
+            title = { Text("Sort By") },
+            text = {
+                Column {
+                    SortOption(
+                        title = "Date (Newest first)",
+                        selected = sortOrder == SortOrder.DATE_DESC,
+                        onClick = {
+                            viewModel.setSortOrder(SortOrder.DATE_DESC)
+                            showSortDialog = false
+                        }
+                    )
+                    SortOption(
+                        title = "Date (Oldest first)",
+                        selected = sortOrder == SortOrder.DATE_ASC,
+                        onClick = {
+                            viewModel.setSortOrder(SortOrder.DATE_ASC)
+                            showSortDialog = false
+                        }
+                    )
+                    SortOption(
+                        title = "Organisation Unit (A-Z)",
+                        selected = sortOrder == SortOrder.ORG_UNIT_ASC,
+                        onClick = {
+                            viewModel.setSortOrder(SortOrder.ORG_UNIT_ASC)
+                            showSortDialog = false
+                        }
+                    )
+                    SortOption(
+                        title = "Organisation Unit (Z-A)",
+                        selected = sortOrder == SortOrder.ORG_UNIT_DESC,
+                        onClick = {
+                            viewModel.setSortOrder(SortOrder.ORG_UNIT_DESC)
+                            showSortDialog = false
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSortDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Filter dialog
+    if (showFilterDialog) {
+        FilterDialog(
+            onDismiss = { showFilterDialog = false },
+            onApplyFilters = { orgUnit, period, state, syncState ->
+                viewModel.setOrgUnitFilter(orgUnit)
+                viewModel.setPeriodFilter(period)
+                viewModel.setStateFilter(state)
+                viewModel.setSyncStateFilter(syncState)
+                showFilterDialog = false
+            },
+            onClearFilters = {
+                viewModel.clearFilters()
+                showFilterDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DatasetInstanceList(
+    instances: List<DatasetInstance>,
+    onItemClick: (DatasetInstance) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(instances) { instance ->
+            DatasetInstanceItem(
+                instance = instance,
+                onClick = { onItemClick(instance) }
+            )
+        }
+    }
+}
+
+@Composable
+fun DatasetInstanceItem(
+    instance: DatasetInstance,
+    onClick: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = instance.periodDisplayName ?: instance.periodId,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                StatusChip(instance.state)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = instance.organisationUnitDisplayName ?: "Unknown Organisation Unit",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Last updated: ${dateFormat.format(instance.lastUpdated)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                SyncStateIcon(instance.syncState)
             }
         }
     }
 }
 
 @Composable
-private fun InstanceListItem(
-    instance: DatasetInstance,
-    onClick: () -> Unit,
-    onSyncClick: () -> Unit
-) {
-    ListCard(
-        listCardState = rememberListCardState(
-            title = ListCardTitleModel(
-                text = instance.periodId,
-                style = MaterialTheme.typography.titleMedium
-            ),
-            additionalInfoColumnState = rememberAdditionalInfoColumnState(
-                additionalInfoList = listOf(
-                    AdditionalInfoItem(value = "Organization Unit: ${instance.organisationUnitUid}"),
-                    AdditionalInfoItem(
-                        value = "Status: ${if (instance.state) "Completed" else "In Progress"}",
-                        style = TextStyle(
-                            color = if (instance.state)
-                                Color.Cyan
-                            else
-                                Color.Gray
-                        )
-                    ),
-                    AdditionalInfoItem(value = "Last Updated: ${formatDate(instance.lastUpdated)}")
-                ),
-                syncProgressItem = TODO(),
-                expandLabelText = TODO(),
-                shrinkLabelText = TODO(),
-                minItemsToShow = TODO(),
-                scrollableContent = TODO()
-            )
-        ),
-        onCardClick = onClick
+fun StatusChip(state: DatasetInstanceState) {
+    val (color, text) = when (state) {
+        DatasetInstanceState.OPEN -> Pair(MaterialTheme.colorScheme.primary, "Open")
+        DatasetInstanceState.COMPLETED -> Pair(MaterialTheme.colorScheme.tertiary, "Completed")
+        DatasetInstanceState.APPROVED -> Pair(MaterialTheme.colorScheme.secondary, "Approved")
+        DatasetInstanceState.LOCKED -> Pair(MaterialTheme.colorScheme.error, "Locked")
+    }
+
+    Surface(
+        color = color.copy(alpha = 0.2f),
+        shape = MaterialTheme.shapes.small
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = color,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+fun SyncStateIcon(syncState: SyncState) {
+    val (icon, tint, contentDescription) = when (syncState) {
+        SyncState.SYNCED -> Triple(
+            Icons.Default.CloudDone,
+            MaterialTheme.colorScheme.primary,
+            "Synced"
+        )
+        SyncState.TO_UPDATE, SyncState.TO_POST -> Triple(
+            Icons.Default.CloudUpload,
+            MaterialTheme.colorScheme.tertiary,
+            "Pending sync"
+        )
+        SyncState.ERROR -> Triple(
+            Icons.Default.CloudOff,
+            MaterialTheme.colorScheme.error,
+            "Sync error"
+        )
+        SyncState.WARNING -> Triple(
+            Icons.Default.Warning,
+            MaterialTheme.colorScheme.error,
+            "Sync warning"
+        )
+    }
+
+    Icon(
+        imageVector = icon,
+        contentDescription = contentDescription,
+        tint = tint
     )
 }
 
-private fun formatDate(dateString: String): String {
-    return try {
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
-        val outputFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US)
-        val date = inputFormat.parse(dateString)
-        outputFormat.format(date)
-    } catch (e: Exception) {
-        dateString
+@Composable
+fun SortOption(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = title)
     }
 }
 
-private fun getSortOrderToggle(current: DatasetInstanceListViewModel.SortOrder): DatasetInstanceListViewModel.SortOrder {
-    return when (current) {
-        DatasetInstanceListViewModel.SortOrder.DATE_DESC -> DatasetInstanceListViewModel.SortOrder.DATE_ASC
-        DatasetInstanceListViewModel.SortOrder.DATE_ASC -> DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS
-        DatasetInstanceListViewModel.SortOrder.COMPLETION_STATUS -> DatasetInstanceListViewModel.SortOrder.DATE_DESC
-    }
+@Composable
+fun FilterDialog(
+    onDismiss: () -> Unit,
+    onApplyFilters: (String?, String?, DatasetInstanceState?, SyncState?) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    var selectedOrgUnit by remember { mutableStateOf<String?>(null) }
+    var selectedPeriod by remember { mutableStateOf<String?>(null) }
+    var selectedState by remember { mutableStateOf<DatasetInstanceState?>(null) }
+    var selectedSyncState by remember { mutableStateOf<SyncState?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Filter Instances") },
+        text = {
+            Column {
+                Text("Organisation Unit", style = MaterialTheme.typography.titleSmall)
+                // In a real app, this would be a dropdown with org units
+                OutlinedTextField(
+                    value = selectedOrgUnit ?: "",
+                    onValueChange = { selectedOrgUnit = it.takeIf { it.isNotEmpty() } },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Select Organisation Unit") }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text("Period", style = MaterialTheme.typography.titleSmall)
+                // In a real app, this would be a dropdown with periods
+                OutlinedTextField(
+                    value = selectedPeriod ?: "",
+                    onValueChange = { selectedPeriod = it.takeIf { it.isNotEmpty() } },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Select Period") }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text("Status", style = MaterialTheme.typography.titleSmall)
+                // Status options
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedState == DatasetInstanceState.OPEN,
+                        onClick = {
+                            selectedState = if (selectedState == DatasetInstanceState.OPEN) null
+                            else DatasetInstanceState.OPEN
+                        },
+                        label = { Text("Open") }
+                    )
+                    FilterChip(
+                        selected = selectedState == DatasetInstanceState.COMPLETED,
+                        onClick = {
+                            selectedState = if (selectedState == DatasetInstanceState.COMPLETED) null
+                            else DatasetInstanceState.COMPLETED
+                        },
+                        label = { Text("Completed") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text("Sync Status", style = MaterialTheme.typography.titleSmall)
+                // Sync status options
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedSyncState == SyncState.SYNCED,
+                        onClick = {
+                            selectedSyncState = if (selectedSyncState == SyncState.SYNCED) null
+                            else SyncState.SYNCED
+                        },
+                        label = { Text("Synced") }
+                    )
+                    FilterChip(
+                        selected = selectedSyncState == SyncState.TO_UPDATE,
+                        onClick = {
+                            selectedSyncState = if (selectedSyncState == SyncState.TO_UPDATE) null
+                            else SyncState.TO_UPDATE
+                        },
+                        label = { Text("To Sync") }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onApplyFilters(selectedOrgUnit, selectedPeriod, selectedState, selectedSyncState)
+                }
+            ) {
+                Text("Apply")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onClearFilters) {
+                    Text("Clear All")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
 }

@@ -1,4 +1,4 @@
-class SaveDataEntryUseCase @Inject constructor(
+class SaveDataValueUseCase @Inject constructor(
     private val repository: DataEntryRepository
 ) {
     operator fun invoke(
@@ -6,13 +6,16 @@ class SaveDataEntryUseCase @Inject constructor(
         periodId: String,
         orgUnitId: String,
         attributeOptionComboId: String,
-        values: Map<String, String>,
-        isNewEntry: Boolean
-    ): Flow<Result<Unit>> = repository.saveDataValues(
+        dataElementId: String,
+        categoryOptionComboId: String,
+        value: String
+    ): Flow<Result<Unit>> = repository.saveDataValue(
         datasetId,
         periodId,
         orgUnitId,
         attributeOptionComboId,
-        values
+        dataElementId,
+        categoryOptionComboId,
+        value
     )
 }
