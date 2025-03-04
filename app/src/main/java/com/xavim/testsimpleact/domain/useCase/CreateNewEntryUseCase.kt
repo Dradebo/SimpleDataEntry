@@ -1,3 +1,6 @@
+import com.xavim.testsimpleact.domain.repository.DataEntryRepository
+import javax.inject.Inject
+
 class CreateNewEntryUseCase @Inject constructor(
     private val repository: DataEntryRepository
 ) {

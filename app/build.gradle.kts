@@ -44,6 +44,9 @@ android {
 
 dependencies {
 
+
+    implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
+
     implementation(platform(libs.androidx.compose.bom))
 
 // Compose libraries
@@ -58,6 +61,7 @@ dependencies {
     implementation("org.hisp.dhis.rules:rule-engine:2.0.48")
     implementation(libs.play.services.tflite.support)
     implementation(libs.androidx.security.crypto.ktx)
+    implementation(libs.play.services.fido)
 
 // Hilt
     val hiltVersion = "2.48"

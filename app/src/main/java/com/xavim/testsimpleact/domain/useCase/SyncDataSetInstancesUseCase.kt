@@ -1,6 +1,7 @@
 package com.xavim.testsimpleact.domain.useCase
 
 import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 class SyncDatasetInstanceUseCase @Inject constructor(

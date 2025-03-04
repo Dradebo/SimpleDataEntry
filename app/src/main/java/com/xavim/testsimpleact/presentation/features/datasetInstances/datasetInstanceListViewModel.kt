@@ -175,15 +175,18 @@ class DatasetInstanceListViewModel @Inject constructor(
                     instance.periodId,
                     instance.organisationUnitUid,
                     instance.attributeOptionComboUid
-                ).collect { result ->
+                ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
                     result.onSuccess {
                         refresh()
-                    }.onFailure { error ->
-                        Log.e("Error syncing dataset instance", error.toString())
+                    }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
+                        Log.e(
+                            "Error syncing dataset instance",
+                            error.toString()
+                        )
                     }
                 }
             } catch (e: Exception) {
-                Log.e( "Error in syncInstance", e.toString())
+                Log.e("Error in syncInstance", e.toString())
             }
         }
     }

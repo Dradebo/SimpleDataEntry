@@ -10,15 +10,11 @@ data class DatasetInstance(
     val organisationUnitUid: String,
     val attributeOptionComboUid: String,
     val state: DatasetInstanceState = DatasetInstanceState.OPEN,
-    val syncState: SyncState = SyncState.SYNCED,
     val lastUpdated: Date,
-    val createdAt: Date,
     val completedBy: String? = null,
     val completedDate: Date? = null,
     val valueCount: Int = 0,
-    val displayName: String? = null,
-    val periodDisplayName: String? = null,
-    val organisationUnitDisplayName: String? = null
+
 )
 
 // Enum for dataset instance state
@@ -37,9 +33,9 @@ enum class SyncState {
     TO_UPDATE,
     TO_POST,
     ERROR,
-    WARNING;
-
-    fun isSynced(): Boolean = this == SYNCED
+    UPLOADING,
+    WARNING,
+    UNKNOWN // Added for handling unrecognized states or null
 }
 
 // Result classes for completion

@@ -4,12 +4,13 @@ import CreateNewEntryUseCase
 import GetDataEntryFormUseCase
 import GetExistingDataValuesUseCase
 import SaveDataEntryUseCase
-import ValidateDataEntryUseCase
+import com.xavim.testsimpleact.domain.useCase.ValidateDataEntryUseCase
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xavim.testsimpleact.domain.model.DataEntrySection
+import com.xavim.testsimpleact.domain.model.DataValue
 import com.xavim.testsimpleact.domain.model.ValidationError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,7 +86,7 @@ class DataEntryViewModel @Inject constructor(
                 }
 
                 // Combine form structure with values
-                formFlow.combine(valuesFlow) { sections, values ->
+                formFlow.combine(valuesFlow) { sections: List<DataEntrySection>, values: List<DataValue> ->
                     // Convert values to a map for easier lookup
                     val valueMap = values.associate {
                         "${it.dataElementId}_${it.categoryOptionComboId}" to it.value
@@ -104,9 +105,9 @@ class DataEntryViewModel @Inject constructor(
                     }
 
                     DataEntryState.Success(mergedSections)
-                }.catch { e ->
-                    Log.e( "Error loading data entry", e.toString())
-                    _uiState.value = DataEntryState.Error(e.message ?: "Unknown error occurred")
+                }.catch { error: Throwable ->
+                    Log.e( "Error loading data entry", error.toString())
+                    _uiState.value = DataEntryState.Error(error.message ?: "Unknown error occurred")
                 }.collect {
                     _uiState.value = it
                     _hasUnsavedChanges.value = false
@@ -233,12 +234,12 @@ class DataEntryViewModel @Inject constructor(
                         requiredAttributeOptionComboId,
                         _dataValues.value,
                         isNewEntry = !isExistingEntry()
-                    ).collect { result ->
+                    ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
                         result.onSuccess {
                             _hasUnsavedChanges.value = false
                             _originalValues.value = _dataValues.value
                             onSuccess()
-                        }.onFailure { error ->
+                        }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
                             onError(error.message ?: "Error saving data")
                         }
                     }

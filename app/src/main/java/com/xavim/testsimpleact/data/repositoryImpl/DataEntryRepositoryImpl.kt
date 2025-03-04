@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.common.ValueType
+import org.hisp.dhis.android.core.dataset.Section
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,27 +28,21 @@ class DataEntryRepositoryImpl @Inject constructor(
 
     override fun getDataEntryForm(dataSetUid: String): Flow<List<DataEntrySection>> = flow {
         try {
-            // Get data set details
-            val dataSet = d2.dataSetModule().dataSets()
-                .withSections()
-                .uid(dataSetUid)
-                .blockingGet()
+
 
             // Get sections with data elements
-            val sections = if (dataSet?.sections()?.isEmpty() == false) {
+            val dataSet = d2.dataSetModule().sections().byDataSetUid().eq(dataSetUid).blockingGet()
+            val sections = if (dataSet.size > 1) {
                 // If dataset has defined sections, use them
-                dataSet.sections()?.map { section ->
-                    val sectionDetails = d2.dataSetModule().sections()
-                        .withDataElements()
-                        .uid(section.uid())
-                        .blockingGet()
+                dataSet.map { section: Section ->
+                    val sectionElements = section.dataElements()
 
                     // Transform each section to our domain model
                     DataEntrySection(
                         uid = section.uid() ?: "",
                         name = section.displayName() ?: "",
                         description = section.description(),
-                        dataElements = sectionDetails?.dataElements()?.map { dataElement ->
+                        dataElements = sectionElements?.map { dataElement ->
                             transformDataElement(dataElement.uid())
                         } ?: emptyList()
                     )
@@ -58,14 +53,14 @@ class DataEntryRepositoryImpl @Inject constructor(
                     .withDataSetElements()
                     .uid(dataSetUid)
                     .blockingGet()
-                    ?.dataSetElements()?.mapNotNull { it.dataElement()?.uid() }
+                    ?.dataSetElements()?.mapNotNull { it.dataElement().uid() }
                     ?.map { dataElementUid -> transformDataElement(dataElementUid) }
                     ?: emptyList()
 
                 listOf(
                     DataEntrySection(
                         uid = "default",
-                        name = dataSet?.displayName() ?: "Data Entry",
+                        name = "Data Entry",
                         dataElements = dataElements
                     )
                 )
@@ -106,8 +101,7 @@ class DataEntryRepositoryImpl @Inject constructor(
             description = dataElement?.description(),
             valueType = mapValueType(dataElement?.valueType()),
             optionSetUid = dataElement?.optionSet()?.uid(),
-            categoryOptionCombos = categoryOptionCombos,
-            mandatory = dataElement?.fieldIsRequired() ?: false
+            categoryOptionCombos = categoryOptionCombos
         )
     }
 
@@ -225,33 +219,9 @@ class DataEntryRepositoryImpl @Inject constructor(
 
             val errors = mutableListOf<ValidationError>()
 
-            // Check if empty and mandatory
-            if (dataElement?.fieldIsRequired() == true && value.isEmpty()) {
-                errors.add(ValidationError(dataElementId, "This field is required"))
-            }
 
-            // Check value type
-            if (dataElement?.valueType()?.isNumeric == true && value.isNotEmpty()) {
-                if (!value.matches(Regex("^-?\\d+(\\.\\d+)?$"))) {
-                    errors.add(ValidationError(dataElementId, "This field requires a numeric value"))
-                } else {
-                    // Check min/max
-                    val numericValue = value.toDoubleOrNull()
-                    if (numericValue != null) {
-                        dataElement.minimumValue()?.toDoubleOrNull()?.let { min ->
-                            if (numericValue < min) {
-                                errors.add(ValidationError(dataElementId, "Value must be at least $min"))
-                            }
-                        }
 
-                        dataElement.maximumValue()?.toDoubleOrNull()?.let { max ->
-                            if (numericValue > max) {
-                                errors.add(ValidationError(dataElementId, "Value must not exceed $max"))
-                            }
-                        }
-                    }
-                }
-            }
+
 
             return errors
         } catch (e: Exception) {

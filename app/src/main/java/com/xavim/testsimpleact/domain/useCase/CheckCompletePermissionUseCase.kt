@@ -1,5 +1,11 @@
 package com.xavim.testsimpleact.domain.useCase
 
+import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
+import kotlinx.coroutines.flow.Flow
+import org.hisp.dhis.android.core.analytics.aggregated.Dimension
+import org.hisp.dhis.android.core.period.Period
+import javax.inject.Inject
+
 class CheckCompletePermissionUseCase @Inject constructor(
     private val repository: DatasetInstanceRepository
 ) {

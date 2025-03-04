@@ -1,10 +1,11 @@
-package com.xavim.testsimpleact.data.repository
+package com.xavim.testsimpleact.data.repositoryImpl
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.google.android.gms.fido.fido2.api.common.ErrorCode
 import com.xavim.testsimpleact.domain.repository.AuthRepository
 import com.xavim.testsimpleact.domain.repository.LoginResult
 import com.xavim.testsimpleact.domain.repository.SessionInfo
@@ -96,7 +97,7 @@ class AuthRepositoryImpl @Inject constructor(
 
                     return@withContext LoginResult.SUCCESS
                 } catch (e: D2Error) {
-                    Timber.e(e, "Login error")
+                    Log.e( "Login error", e.toString())
 
                     // Record failed attempt
                     recordFailedLoginAttempt(username)
@@ -113,7 +114,7 @@ class AuthRepositoryImpl @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Unexpected login error")
+                Log.e( "Unexpected login error", e.toString())
                 return@withContext LoginResult.SERVER_ERROR
             }
         }

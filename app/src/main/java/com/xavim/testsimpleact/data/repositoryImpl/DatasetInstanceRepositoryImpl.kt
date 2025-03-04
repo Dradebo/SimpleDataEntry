@@ -3,11 +3,11 @@ package com.xavim.testsimpleact.data.repositoryImpl
 import android.util.Log
 import com.xavim.testsimpleact.domain.model.DatasetInstance
 import com.xavim.testsimpleact.domain.model.DatasetInstanceState
+import com.xavim.testsimpleact.domain.model.OrganisationUnit
+import com.xavim.testsimpleact.domain.model.Period
 import com.xavim.testsimpleact.domain.model.SyncState
 import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
 import com.xavim.testsimpleact.domain.repository.DatasetMetadata
-import com.xavim.testsimpleact.domain.repository.OrganisationUnit
-import com.xavim.testsimpleact.domain.repository.Period
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -15,12 +15,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.arch.repositories.scope.RepositoryScope
-import org.hisp.dhis.android.core.dataset.DataSetCompleteRegistration
 import org.hisp.dhis.android.core.dataset.DataSetInstance
 import org.hisp.dhis.android.core.maintenance.D2Error
-import org.hisp.dhis.android.core.organisationunit.OrganisationUnit.Scope
-import org.hisp.dhis.android.core.organisationunit.internal.OrganisationUnitFields.displayName
-import org.hisp.dhis.android.core.period.PeriodType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,44 +26,46 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
     private val d2: D2,
     private val dispatcher: CoroutineDispatcher
 ) : DatasetInstanceRepository {
-
     override fun getDatasetInstances(
         datasetId: String,
         orgUnitId: String?,
         periodId: String?,
         state: DatasetInstanceState?,
         syncState: SyncState?
-    ): Flow<List<DatasetInstance>> = flow {
-        try {
-            val dataSetInstanceRepository = d2.dataSetModule().dataSetInstances()
-                .byDataSetUid().eq(datasetId)
+    ): Flow<List<DatasetInstance>> {
+        flow() {
+            try {
+                val dataSetInstanceRepository = d2.dataSetModule().dataSetInstances()
+                    .byDataSetUid().eq(datasetId)
 
-            // Apply filters if provided
-            val filteredRepo = dataSetInstanceRepository.apply {
-                orgUnitId?.let { byOrganisationUnitUid().eq(it) }
-                periodId?.let { byPeriod().eq(it) }
-                state?.let {
-                    when (it) {
-                        DatasetInstanceState.COMPLETED -> byCompleted().isTrue
-                        DatasetInstanceState.OPEN -> byCompleted().isFalse
-                        else -> this // No filter for APPROVED or LOCKED yet
+                // Apply filters if provided
+                val filteredRepo = dataSetInstanceRepository.apply {
+                    orgUnitId?.let { byOrganisationUnitUid().eq(it) }
+                    periodId?.let { byPeriod().eq(it) }
+                    state?.let {
+                        when (it) {
+                            DatasetInstanceState.COMPLETED -> byCompleted().isTrue
+                            DatasetInstanceState.OPEN -> byCompleted().isFalse
+                            else -> this // No filter for APPROVED or LOCKED yet
+                        }
                     }
+                    // No direct mapping for SyncState in SDK
                 }
-                // No direct mapping for SyncState in SDK
+
+                // Get instances and map to domain model
+                val instances = filteredRepo
+                    .orderByLastUpdated(RepositoryScope.OrderByDirection.DESC)
+                    .blockingGet()
+                    .map { it.toDomainModel() }
+
+                emit(instances)
+            } catch (e: Exception) {
+                Log.e("Error fetching dataset instances", e.toString())
+                emit(emptyList())
             }
-
-            // Get instances and map to domain model
-            val instances = filteredRepo
-                .orderByLastUpdated(RepositoryScope.OrderByDirection.DESC)
-                .blockingGet()
-                .map { it.toDomainModel() }
-
-            emit(instances)
-        } catch (e: Exception) {
-            Log.e("Error fetching dataset instances", e.toString())
-            emit(emptyList())
         }
-    }.flowOn(dispatcher)
+        return flow
+    }
 
     private fun DataSetInstance.toDomainModel(): DatasetInstance {
         val state = if (completed() == true) {
@@ -76,14 +74,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
             DatasetInstanceState.OPEN
         }
 
-        // Determine sync state based on state in local database
-        val syncState = when {
-            syncState() == org.hisp.dhis.android.core.common.State.SYNCED -> SyncState.SYNCED
-            syncState() == org.hisp.dhis.android.core.common.State.TO_UPDATE -> SyncState.TO_UPDATE
-            syncState() == org.hisp.dhis.android.core.common.State.TO_POST -> SyncState.TO_POST
-            syncState() == org.hisp.dhis.android.core.common.State.ERROR -> SyncState.ERROR
-            else -> SyncState.SYNCED
-        }
+
 
         // Get completion details if completed
         val completionDetails = if (state == DatasetInstanceState.COMPLETED) {
@@ -106,15 +97,10 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
             organisationUnitUid = organisationUnitUid() ?: "",
             attributeOptionComboUid = attributeOptionComboUid() ?: "",
             state = state,
-            syncState = syncState,
             lastUpdated = lastUpdated() ?: Date(),
-            createdAt = created() ?: Date(),
             completedBy = completionDetails?.storedBy(),
             completedDate = completionDetails?.date(),
-            valueCount = valueCount() ?: 0,
-            displayName = displayName,
-            periodDisplayName = periodDisplayName(),
-            organisationUnitDisplayName = organisationUnitDisplayName()
+            valueCount = valueCount() ?: 0
         )
     }
 
@@ -130,16 +116,15 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                     name = dataset.displayName() ?: dataset.name() ?: "",
                     description = dataset.description(),
                     periodType = dataset.periodType()?.name ?: "",
-                    categoryCombo = dataset.categoryCombo()?.uid(),
                     canCreateNew = true, // Default to true, could be determined by permissions
-                    formType = dataset.formType()?.name ?: "DEFAULT"
+                    lastSync = dataset.lastUpdated()
                 )
                 emit(metadata)
             } else {
                 throw Exception("Dataset not found")
             }
         } catch (e: Exception) {
-            Log.e( "Error fetching dataset metadata", e.toString())
+            Log.e("Error fetching dataset metadata", e.toString())
             throw e
         }
     }.flowOn(dispatcher)
@@ -176,7 +161,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
             // Editable if not completed, period is open, and user has write permission
             !isCompleted && isPeriodOpen && hasWritePermission
         } catch (e: Exception) {
-            Log.e( "Error checking if dataset instance is editable", e.toString())
+            Log.e("Error checking if dataset instance is editable", e.toString())
             false
         }
     }
@@ -189,15 +174,6 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
         completedBy: String?
     ): Flow<Result<Unit>> = flow {
         try {
-            // Check if all mandatory fields are filled
-            val mandatoryFieldsComplete = checkMandatoryFields(
-                datasetId, periodId, orgUnitId, attributeOptionComboId
-            )
-
-            if (!mandatoryFieldsComplete) {
-                emit(Result.failure(Exception("Mandatory fields are not complete")))
-                return@flow
-            }
 
             // Complete the dataset
             d2.dataSetModule().dataSetCompleteRegistrations()
@@ -205,67 +181,21 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                     periodId,
                     orgUnitId,
                     datasetId,
-                    attributeOptionComboId,
-                    Date(),
-                    completedBy ?: d2.userModule().user().blockingGet()?.username() ?: "",
-                    false
+                    attributeOptionComboId
                 )
                 .blockingSet()
 
             emit(Result.success(Unit))
         } catch (e: D2Error) {
-            Log.e( "Error completing dataset instance", e.toString())
+            Log.e("Error completing dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to complete: ${e.errorDescription()}")))
         } catch (e: Exception) {
-            Log.e( "Error completing dataset instance", e.toString())
+            Log.e("Error completing dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to complete: ${e.message}")))
         }
     }.flowOn(dispatcher)
 
-    private suspend fun checkMandatoryFields(
-        datasetId: String,
-        periodId: String,
-        orgUnitId: String,
-        attributeOptionComboId: String
-    ): Boolean = withContext(dispatcher) {
-        try {
-            // Get all data elements in the dataset
-            val dataElements = d2.dataSetModule().dataSets()
-                .withDataSetElements()
-                .uid(datasetId)
-                .blockingGet()
-                ?.dataSetElements()
-                ?.mapNotNull { it.dataElement()?.uid() }
-                ?: emptyList()
 
-            // Get all mandatory data elements
-            val mandatoryDataElements = dataElements.filter { dataElementUid ->
-                d2.dataElementModule().dataElements()
-                    .uid(dataElementUid)
-                    .blockingGet()
-                    ?.fieldIsRequired() == true
-            }
-
-            if (mandatoryDataElements.isEmpty()) {
-                return@withContext true
-            }
-
-            // Check if all mandatory data elements have values
-            val dataValues = d2.dataValueModule().dataValues()
-                .byDataSetUid(datasetId)
-                .byPeriod().eq(periodId)
-                .byOrganisationUnitUid().eq(orgUnitId)
-                .byAttributeOptionComboUid().eq(attributeOptionComboId)
-                .blockingGet()
-
-            val dataElementsWithValues = dataValues.mapNotNull { it.dataElement() }.toSet()
-
-            mandatoryDataElements.all { dataElementsWithValues.contains(it) }
-        } catch (e: Exception) {
-            Log.e( "Error checking mandatory fields", e.toString())
-            false
-        }
-    }
 
     override suspend fun reopenDatasetInstance(
         datasetId: String,
@@ -280,14 +210,14 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                 .byPeriod().eq(periodId)
                 .byOrganisationUnitUid().eq(orgUnitId)
                 .byAttributeOptionComboUid().eq(attributeOptionComboId)
-                .blockingDelete()
+                .blockingUpload()
 
             emit(Result.success(Unit))
         } catch (e: D2Error) {
-            Log.e( "Error reopening dataset instance", e.toString())
+            Log.e("Error reopening dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to reopen: ${e.errorDescription()}")))
         } catch (e: Exception) {
-            Log.e( "Error reopening dataset instance", e.toString())
+            Log.e("Error reopening dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to reopen: ${e.message}")))
         }
     }.flowOn(dispatcher)
@@ -306,7 +236,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                 .byOrganisationUnitUid().eq(orgUnitId)
                 .byAttributeOptionComboUid().eq(attributeOptionComboId)
                 .upload()
-                .blockingAwait()
+
 
             // Sync complete registration if exists
             val completeRegistration = d2.dataSetModule().dataSetCompleteRegistrations()
@@ -319,15 +249,14 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
             if (completeRegistration != null) {
                 d2.dataSetModule().dataSetCompleteRegistrations()
                     .upload()
-                    .blockingAwait()
             }
 
             emit(Result.success(Unit))
         } catch (e: D2Error) {
-            Log.e( "Error syncing dataset instance", e.toString())
+            Log.e("Error syncing dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to sync: ${e.errorDescription()}")))
         } catch (e: Exception) {
-            Log.e( "Error syncing dataset instance", e.toString())
+            Log.e("Error syncing dataset instance", e.toString())
             emit(Result.failure(Exception("Failed to sync: ${e.message}")))
         }
     }.flowOn(dispatcher)
@@ -340,7 +269,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
 
             dataset?.access()?.data()?.write() ?: false
         } catch (e: Exception) {
-            Log.e( "Error checking complete permission", e.toString())
+            Log.e("Error checking complete permission", e.toString())
             false
         }
     }
@@ -352,7 +281,6 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                 .blockingGet()
 
             val periodType = dataset?.periodType()
-
             if (periodType != null) {
                 val periods = d2.periodModule().periods()
                     .byPeriodType().eq(periodType)
@@ -373,7 +301,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
                 emit(emptyList())
             }
         } catch (e: Exception) {
-            Log.e( "Error fetching available periods", e.toString())
+            Log.e("Error fetching available periods", e.toString())
             emit(emptyList())
         }
     }.flowOn(dispatcher)
@@ -433,7 +361,7 @@ class DatasetInstanceRepositoryImpl @Inject constructor(
 
             emit(orgUnits)
         } catch (e: Exception) {
-            Log.e( "Error fetching available org units", e.toString())
+            Log.e("Error fetching available org units", e.toString())
             emit(emptyList())
         }
     }.flowOn(dispatcher)

@@ -97,11 +97,12 @@ class DatasetInstanceDetailViewModel @Inject constructor(
                 _isProcessing.value = true
                 completeDatasetInstanceUseCase(
                     datasetId, periodId, orgUnitId, attributeOptionComboId
-                ).collect { result ->
+                ).collect { result: Result<Unit> ->
                     result.onSuccess {
                         _message.value = "Dataset completed successfully"
                         loadInstanceDetails()
-                    }.onFailure { error ->
+                    }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
+                        Log.e("Error completing dataset instance", error.toString())
                         _message.value = "Error completing dataset: ${error.message}"
                     }
                 }
@@ -120,16 +121,17 @@ class DatasetInstanceDetailViewModel @Inject constructor(
                 _isProcessing.value = true
                 reopenDatasetInstanceUseCase(
                     datasetId, periodId, orgUnitId, attributeOptionComboId
-                ).collect { result ->
+                ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
                     result.onSuccess {
                         _message.value = "Dataset reopened successfully"
                         loadInstanceDetails()
-                    }.onFailure { error ->
+                    }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
+                        Log.e("Error reopening dataset instance", error.toString())
                         _message.value = "Error reopening dataset: ${error.message}"
                     }
                 }
             } catch (e: Exception) {
-                Log.e("Error reopening dataset instance",  e.toString())
+                Log.e("Error reopening dataset instance", e.toString())
                 _message.value = "Error reopening dataset: ${e.message}"
             } finally {
                 _isProcessing.value = false
@@ -143,11 +145,12 @@ class DatasetInstanceDetailViewModel @Inject constructor(
                 _isProcessing.value = true
                 syncDatasetInstanceUseCase(
                     datasetId, periodId, orgUnitId, attributeOptionComboId
-                ).collect { result ->
+                ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
                     result.onSuccess {
                         _message.value = "Dataset synced successfully"
                         loadInstanceDetails()
-                    }.onFailure { error ->
+                    }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
+                        Log.e("Error syncing dataset instance", error.toString())
                         _message.value = "Error syncing dataset: ${error.message}"
                     }
                 }

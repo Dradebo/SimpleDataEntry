@@ -1,3 +1,7 @@
+import com.xavim.testsimpleact.domain.repository.DataEntryRepository
+import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+
 class SaveDataEntryUseCase @Inject constructor(
     private val repository: DataEntryRepository
 ) {

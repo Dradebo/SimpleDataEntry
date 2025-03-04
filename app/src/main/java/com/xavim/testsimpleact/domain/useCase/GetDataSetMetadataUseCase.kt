@@ -8,7 +8,7 @@ import javax.inject.Inject
 class GetDatasetMetadataUseCase @Inject constructor(
     private val repository: DatasetInstanceRepository
 ) {
-    operator fun invoke(datasetId: String): Flow<DatasetMetadata> =
+    suspend operator fun invoke(datasetId: String): Flow<DatasetMetadata> =
         repository.getDatasetMetadata(datasetId)
 }
 
