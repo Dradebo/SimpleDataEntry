@@ -33,23 +33,23 @@ interface DataEntryRepository {
         values: Map<String, String>
     ): Flow<Result<Unit>>
 
-    fun validateDataValue(
-        dataElementId: String,
-        value: String
-    ): List<ValidationError>
+//    fun validateDataValue(
+//        dataElementId: String,
+//        value: String
+//    ): List<ValidationError>
 
-    fun validateAllValues(values: Map<String, String>): List<ValidationError>
-
-    // Helper to determine if a form has too many fields (for UI decisions)
-    fun getCategoryOptionComboCount(dataSetUid: String): Int
-
-    // Whether this is an existing entry or new
-    fun isExistingEntry(
-        datasetId: String,
-        periodId: String,
-        orgUnitId: String,
-        attributeOptionComboId: String
-    ): Boolean
+//    fun validateAllValues(values: Map<String, String>): List<ValidationError>
+//
+//    // Helper to determine if a form has too many fields (for UI decisions)
+//    fun getCategoryOptionComboCount(dataSetUid: String): Int
+//
+//    // Whether this is an existing entry or new
+//    fun isExistingEntry(
+//        datasetId: String,
+//        periodId: String,
+//        orgUnitId: String,
+//        attributeOptionComboId: String
+//    ): Boolean
 
     // Generate required IDs for new entries
     fun generatePeriodId(): String

@@ -24,7 +24,6 @@ import javax.inject.Inject
 
 class DatasetInstanceRepositoryImpl @Inject constructor(
     private val d2: D2,
-    private val dispatcher: CoroutineDispatcher
 ) : DatasetInstanceRepository {
     override fun getDatasetInstances(
         datasetId: String,

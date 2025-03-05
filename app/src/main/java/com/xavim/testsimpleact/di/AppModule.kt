@@ -20,7 +20,6 @@ import com.xavim.testsimpleact.domain.repository.DatasetInstanceRepository
 import com.xavim.testsimpleact.domain.repository.DatasetRepository
 import com.xavim.testsimpleact.domain.repository.Logger
 import com.xavim.testsimpleact.domain.repository.SystemRepository
-import com.xavim.testsimpleact.domain.useCase.CompleteDataEntryUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDataSetsUseCase
 import com.xavim.testsimpleact.domain.useCase.GetDatasetInstancesUseCase
 
@@ -28,6 +27,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import org.hisp.dhis.android.core.D2
 import javax.inject.Singleton
 
@@ -76,8 +77,7 @@ object AppModule {
         val d2 = sessionManager.getD2()
         // If d2 is null at this point, we might throw an exception
         // or handle a fallback scenario. For brevity, we assume d2 is non-null after init.
-        return d2?.let { DatasetRepositoryImpl(it) }
-            ?: throw IllegalStateException("D2 is not initialized. Check session initialization.")
+        return DatasetRepositoryImpl(d2)
     }
 
     /**
@@ -96,10 +96,8 @@ object AppModule {
         sessionManager: SessionManager
     ): DatasetInstanceRepository {
         val d2 = sessionManager.getD2()
-        // If d2 is null at this point, we might throw an exception
-        // or handle a fallback scenario. For brevity, we assume d2 is non-null after init.
-        return d2.let { DatasetInstanceRepositoryImpl(it) }
-            ?: throw IllegalStateException("D2 is not initialized. Check session initialization.")
+//        val dispatcher:CoroutineDispatcher = Dispatchers.IO
+        return DatasetInstanceRepositoryImpl(d2)
     }
 
     /**
@@ -112,16 +110,15 @@ object AppModule {
         return GetDatasetInstancesUseCase(datasetInstance)
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     @Provides
     @Singleton
     fun provideEntryRepository(
         sessionManager: SessionManager
     ): DataEntryRepository {
         val d2 = sessionManager.getD2()
-        // If d2 is null at this point, we might throw an exception
-        // or handle a fallback scenario. For brevity, we assume d2 is non-null after init.
-        return d2?.let { DataEntryRepositoryImpl(it) }
-            ?: throw IllegalStateException("D2 is not initialized. Check session initialization.")
+
+        return DataEntryRepositoryImpl(d2)
     }
 
     /**
@@ -160,19 +157,26 @@ object AppModule {
     ): GetExistingDataValuesUseCase =
         GetExistingDataValuesUseCase(repository)
 
-    @Provides
-    fun provideSaveDataEntryUseCase(
-        repository: DataEntryRepository
-    ): SaveDataEntryUseCase =
-        SaveDataEntryUseCase(repository)
+//    @Provides
+//    fun provideSaveDataEntryUseCase(
+//        repository: DataEntryRepository
+//    ): SaveDataEntryUseCase =
+//        SaveDataEntryUseCase(repository)
 
-    @Provides
-    fun provideValidateDataEntryUseCase(): ValidateDataEntryUseCase =
-        ValidateDataEntryUseCase()
+//    @Provides
+//    fun provideValidateDataEntryUseCase(
+//        repository: DataEntryRepository
+//    ): ValidateDataEntryUseCase =
+//        ValidateDataEntryUseCase(repository)
+//
+//    @Provides
+//    @Singleton
+//    fun provideIODispatcher(): CoroutineDispatcher = Dispatchers.IO
 
-    @Provides
-    fun provideCompleteDataEntryUseCase(
-        repository: DataEntryRepository
-    ): CompleteDataEntryUseCase =
-        CompleteDataEntryUseCase(repository)
+
+//    @Provides
+//    fun provideCompleteDataEntryUseCase(
+//        repository: DataEntryRepository
+//    ): CompleteDataEntryUseCase =
+//        CompleteDataEntryUseCase(repository)
 }

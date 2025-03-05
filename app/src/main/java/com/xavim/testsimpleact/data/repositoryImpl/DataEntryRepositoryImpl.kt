@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.common.ValueType
 import org.hisp.dhis.android.core.dataset.Section
+import org.hisp.dhis.android.core.organisationunit.OrganisationUnit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,7 +24,7 @@ import javax.inject.Inject
 
 class DataEntryRepositoryImpl @Inject constructor(
     private val d2: D2,
-    private val dispatcher: CoroutineDispatcher
+
 ) : DataEntryRepository {
 
     override fun getDataEntryForm(dataSetUid: String): Flow<List<DataEntrySection>> = flow {
@@ -71,7 +72,9 @@ class DataEntryRepositoryImpl @Inject constructor(
             Log.e( "Error fetching data entry form", e.toString())
             emit(emptyList())
         }
-    }.flowOn(dispatcher)
+    }.flowOn(
+        context = TODO()
+    )
 
     private fun transformDataElement(dataElementUid: String): DataEntryElement {
         val dataElement = d2.dataElementModule().dataElements()
@@ -134,7 +137,9 @@ class DataEntryRepositoryImpl @Inject constructor(
             Log.e( "Error fetching existing values", e.toString())
             emit(emptyList())
         }
-    }.flowOn(dispatcher)
+    }.flowOn(
+        context = TODO()
+    )
 
     override fun saveDataValue(
         datasetId: String,
@@ -147,11 +152,11 @@ class DataEntryRepositoryImpl @Inject constructor(
     ): Flow<Result<Unit>> = flow {
         try {
             // First validate
-            val errors = validateDataValue(dataElementId, value)
-            if (errors.isNotEmpty()) {
-                emit(Result.failure(Exception(errors.first().message)))
-                return@flow
-            }
+//            val errors = validateDataValue(dataElementId, value)
+//            if (errors.isNotEmpty()) {
+//                emit(Result.failure(Exception(errors.first().message)))
+//                return@flow
+//            }
 
             // Then save
             d2.dataValueModule().dataValues().value(
@@ -167,7 +172,7 @@ class DataEntryRepositoryImpl @Inject constructor(
             Log.e( "Error saving data value", e.toString())
             emit(Result.failure(e))
         }
-    }.flowOn(dispatcher)
+    }.flowOn(context = (TODO())
 
     override fun saveDataValues(
         datasetId: String,
@@ -178,11 +183,11 @@ class DataEntryRepositoryImpl @Inject constructor(
     ): Flow<Result<Unit>> = flow {
         try {
             // First validate all
-            val errors = validateAllValues(values)
-            if (errors.isNotEmpty()) {
-                emit(Result.failure(Exception("Validation failed")))
-                return@flow
-            }
+//            val errors = validateAllValues(values)
+//            if (errors.isNotEmpty()) {
+//                emit(Result.failure(Exception("Validation failed")))
+//                return@flow
+//            }
 
             // Then save all
             values.forEach { (key, value) ->
@@ -206,45 +211,45 @@ class DataEntryRepositoryImpl @Inject constructor(
             Log.e("Error saving multiple values", e.toString())
             emit(Result.failure(e))
         }
-    }.flowOn(dispatcher)
+    }.flowOn(context = TODO())
 
-    override fun validateDataValue(
-        dataElementId: String,
-        value: String
-    ): List<ValidationError> {
-        try {
-            val dataElement = d2.dataElementModule().dataElements()
-                .uid(dataElementId)
-                .blockingGet()
+//    override fun validateDataValue(
+//        dataElementId: String,
+//        value: String
+//    ): List<ValidationError> {
+//        try {
+//            val dataElement = d2.dataElementModule().dataElements()
+//                .uid(dataElementId)
+//                .blockingGet()
+//
+//            val errors = mutableListOf<ValidationError>()
+//
+//
+//
+//
+//
+//            return errors
+//        } catch (e: Exception) {
+//            Log.e("Error validating data value", e.toString())
+//            return listOf(ValidationError(dataElementId, "Validation error: ${e.message}"))
+//        }
+//    }
 
-            val errors = mutableListOf<ValidationError>()
-
-
-
-
-
-            return errors
-        } catch (e: Exception) {
-            Log.e("Error validating data value", e.toString())
-            return listOf(ValidationError(dataElementId, "Validation error: ${e.message}"))
-        }
-    }
-
-    override fun validateAllValues(values: Map<String, String>): List<ValidationError> {
-        val allErrors = mutableListOf<ValidationError>()
-
-        // Validate each value
-        values.forEach { (key, value) ->
-            val parts = key.split("_")
-            if (parts.size >= 2) {
-                val dataElementId = parts[0]
-                val errors = validateDataValue(dataElementId, value)
-                allErrors.addAll(errors)
-            }
-        }
-
-        return allErrors
-    }
+//    override fun validateAllValues(values: Map<String, String>): List<ValidationError> {
+//        val allErrors = mutableListOf<ValidationError>()
+//
+//        // Validate each value
+//        values.forEach { (key, value) ->
+//            val parts = key.split("_")
+//            if (parts.size >= 2) {
+//                val dataElementId = parts[0]
+//                val errors = validateDataValue(dataElementId, value)
+//                allErrors.addAll(errors)
+//            }
+//        }
+//
+//        return allErrors
+//    }
 
     override fun getCategoryOptionComboCount(dataSetUid: String): Int {
         var totalCount = 0
@@ -307,7 +312,7 @@ class DataEntryRepositoryImpl @Inject constructor(
         // Get the first org unit available to the user
         return try {
             d2.organisationUnitModule().organisationUnits()
-                .byOrganisationUnitScope(org.hisp.dhis.android.core.organisationunit.OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
+                .byOrganisationUnitScope(OrganisationUnit.Scope.SCOPE_DATA_CAPTURE)
                 .blockingGet()
                 .firstOrNull()
                 ?.uid() ?: ""

@@ -28,8 +28,8 @@ import javax.inject.Inject
 class DataEntryViewModel @Inject constructor(
     private val getDataEntryFormUseCase: GetDataEntryFormUseCase,
     private val getExistingDataValuesUseCase: GetExistingDataValuesUseCase,
-    private val saveDataEntryUseCase: SaveDataEntryUseCase,
-    private val validateDataEntryUseCase: ValidateDataEntryUseCase,
+//    private val saveDataEntryUseCase: SaveDataEntryUseCase,
+//    private val validateDataEntryUseCase: ValidateDataEntryUseCase,
     private val createNewEntryUseCase: CreateNewEntryUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -174,7 +174,7 @@ class DataEntryViewModel @Inject constructor(
         updateSectionWithValue(dataElementId, categoryOptionComboId, value)
 
         // Validate the field immediately
-        validateField(dataElementId, value)
+//        validateField(dataElementId, value)
     }
 
     private fun updateSectionWithValue(
@@ -208,51 +208,51 @@ class DataEntryViewModel @Inject constructor(
         }
     }
 
-    private fun validateField(dataElementId: String, value: String) {
-        viewModelScope.launch {
-            val currentErrors = _validationErrors.value.filter { it.elementId != dataElementId }
-            val newErrors = validateDataEntryUseCase.validateField(dataElementId, value)
-            _validationErrors.value = currentErrors + newErrors
-        }
-    }
-
-    fun validateAndSave(onSuccess: () -> Unit, onError: (String) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val allErrors = validateDataEntryUseCase(_dataValues.value)
-
-                if (allErrors.isEmpty()) {
-                    val requiredPeriodId = periodId ?: createNewEntryUseCase.generatePeriodId()
-                    val requiredOrgUnitId = orgUnitId ?: createNewEntryUseCase.getDefaultOrgUnitId()
-                    val requiredAttributeOptionComboId = attributeOptionComboId ?:
-                    createNewEntryUseCase.getDefaultAttributeOptionComboId()
-
-                    saveDataEntryUseCase(
-                        datasetId,
-                        requiredPeriodId,
-                        requiredOrgUnitId,
-                        requiredAttributeOptionComboId,
-                        _dataValues.value,
-                        isNewEntry = !isExistingEntry()
-                    ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
-                        result.onSuccess {
-                            _hasUnsavedChanges.value = false
-                            _originalValues.value = _dataValues.value
-                            onSuccess()
-                        }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
-                            onError(error.message ?: "Error saving data")
-                        }
-                    }
-                } else {
-                    _validationErrors.value = allErrors
-                    onError("Please fix validation errors before saving")
-                }
-            } catch (e: Exception) {
-                Log.e("Error in validateAndSave", e.toString())
-                onError(e.message ?: "Unknown error occurred while saving")
-            }
-        }
-    }
+//    private fun validateField(dataElementId: String, value: String) {
+//        viewModelScope.launch {
+//            val currentErrors = _validationErrors.value.filter { it.elementId != dataElementId }
+//            val newErrors = validateDataEntryUseCase.validateField(dataElementId, value)
+//            _validationErrors.value = currentErrors + newErrors
+//        }
+//    }
+//
+//    fun validateAndSave(onSuccess: () -> Unit, onError: (String) -> Unit) {
+//        viewModelScope.launch {
+//            try {
+//                val allErrors = validateDataEntryUseCase(_dataValues.value)
+//
+//                if (allErrors.isEmpty()) {
+//                    val requiredPeriodId = periodId ?: createNewEntryUseCase.generatePeriodId()
+//                    val requiredOrgUnitId = orgUnitId ?: createNewEntryUseCase.getDefaultOrgUnitId()
+//                    val requiredAttributeOptionComboId = attributeOptionComboId ?:
+//                    createNewEntryUseCase.getDefaultAttributeOptionComboId()
+//
+//                    saveDataEntryUseCase(
+//                        datasetId,
+//                        requiredPeriodId,
+//                        requiredOrgUnitId,
+//                        requiredAttributeOptionComboId,
+//                        _dataValues.value,
+//                        isNewEntry = !isExistingEntry()
+//                    ).collect { result: Result<Unit> -> // Explicitly specify the type as Result<Unit>
+//                        result.onSuccess {
+//                            _hasUnsavedChanges.value = false
+//                            _originalValues.value = _dataValues.value
+//                            onSuccess()
+//                        }.onFailure { error: Throwable -> // Explicitly specify the type as Throwable
+//                            onError(error.message ?: "Error saving data")
+//                        }
+//                    }
+//                } else {
+//                    _validationErrors.value = allErrors
+//                    onError("Please fix validation errors before saving")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("Error in validateAndSave", e.toString())
+//                onError(e.message ?: "Unknown error occurred while saving")
+//            }
+//        }
+//    }
 
     fun resetToOriginalValues() {
         _dataValues.value = _originalValues.value
