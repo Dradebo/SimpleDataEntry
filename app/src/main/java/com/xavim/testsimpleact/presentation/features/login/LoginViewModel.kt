@@ -21,8 +21,6 @@ import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 
-
-
 sealed class NavigationEvent {
     object NavigateToDatasets : NavigationEvent()
     object NavigateToLogin : NavigationEvent()
@@ -107,7 +105,7 @@ class LoginViewModel @Inject constructor(
 
                 validateForm()
             } catch (e: Exception) {
-                Log.e( "Error loading stored credentials", e.toString())
+                Log.e("LoginViewModel", "Error loading stored credentials", e)
             }
         }
     }
@@ -154,6 +152,7 @@ class LoginViewModel @Inject constructor(
 
             when (result) {
                 LoginResult.SUCCESS -> {
+                    Log.d("Login Success", "Navigating to dataset screen")
                     _loginState.value = LoginState.Success
                     _navigationEvent.value = NavigationEvent.NavigateToDatasets
                 }
@@ -185,7 +184,7 @@ class LoginViewModel @Inject constructor(
                 _password.value = ""
                 _loginState.value = LoginState.Initial
             } catch (e: Exception) {
-                Log.e( "Logout error", e.toString())
+                Log.e("LoginViewModel", "Logout error", e)
                 _navigationEvent.value = NavigationEvent.ShowMessage("Error logging out: ${e.message}")
             }
         }

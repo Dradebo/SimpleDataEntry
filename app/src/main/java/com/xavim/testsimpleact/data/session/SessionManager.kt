@@ -3,10 +3,10 @@ package com.xavim.testsimpleact.data.session
 import android.content.Context
 import com.xavim.testsimpleact.data.repositoryImpl.AndroidLogger
 import com.xavim.testsimpleact.domain.model.Dhis2Config
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.D2Configuration
 import org.hisp.dhis.android.core.D2Manager
@@ -20,8 +20,8 @@ class SessionManager @Inject constructor(
 ) {
     private var d2: D2? = null
 
-    // Session timeout duration in milliseconds (10 minutes)
-    private val SESSION_TIMEOUT_DURATION = 10 * 60 * 1000
+    // Session timeout duration in milliseconds (30 minutes)
+    private val SESSION_TIMEOUT_DURATION = 30 * 60 * 1000
 
     /**
      * Initialize the DHIS2 SDK (D2)
@@ -34,7 +34,7 @@ class SessionManager @Inject constructor(
                 if (d2 == null) {
                     logger.d("SessionManager", "Initializing D2")
                     val d2Config = D2Configuration.builder()
-                        .appName("TestSimpleAct")
+                        .appName("SimpleDataEntry")
                         .appVersion("1.0.0")
                         .readTimeoutInSeconds(30)
                         .connectTimeoutInSeconds(30)
@@ -76,7 +76,7 @@ class SessionManager @Inject constructor(
                 preferences.setValue(Preference.SERVER_URL.toString(), serverUrl)
                 preferences.setValue(Preference.USERNAME.toString(), username)
             }
-            emit(loginSuccessful)
+            emit(loginSuccessful as Boolean)
         } catch (e: Exception) {
             logger.e("SessionManager", "Login failed", e)
             emit(false)

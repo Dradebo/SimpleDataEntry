@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xavim.testsimpleact.domain.model.Dhis2Config
 import com.xavim.testsimpleact.data.session.SessionManager
 import com.xavim.testsimpleact.domain.repository.AuthRepository
 import com.xavim.testsimpleact.domain.useCase.GetDataSetsUseCase
@@ -39,7 +38,6 @@ class DatasetGridViewModel @Inject constructor(
                     sessionManager.initD2(context)
                 }
 
-
                 fetchDataSets()
             } catch (e: Exception) {
                 Log.e("DatasetViewModel", "Failed to initialize/login", e)
@@ -60,11 +58,7 @@ class DatasetGridViewModel @Inject constructor(
                     )
                 }
                 .collect { datasets ->
-//                    _uiState.value = if (datasets.isEmpty()) {
-//                        DatasetScreenState.Success(emptyList())
-//                    } else {
-                      _uiState.value = DatasetScreenState.Success(datasets)
-//                    }
+                    _uiState.value = DatasetScreenState.Success(datasets)
                 }
         } catch (e: Exception) {
             Log.e("DatasetViewModel", "Error in fetchDataSets", e)
@@ -82,7 +76,7 @@ class DatasetGridViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             try {
-                sessionManager.logout()
+                authRepository.logout()
                 // Optionally update UI state or trigger navigation
             } catch (e: Exception) {
                 Log.e("DatasetViewModel", "Logout failed", e)

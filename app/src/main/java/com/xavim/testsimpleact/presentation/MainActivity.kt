@@ -8,7 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.xavim.testsimpleact.presentation.navigation.AppNavigation
+import com.xavim.testsimpleact.navigation.AppNavigation
 import com.xavim.testsimpleact.theme.TestsimpleactTheme
 import dagger.hilt.android.AndroidEntryPoint
 

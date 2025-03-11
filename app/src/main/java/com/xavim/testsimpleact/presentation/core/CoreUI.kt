@@ -50,9 +50,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.xavim.testsimpleact.domain.model.DataElementValueType
-//import org.hisp.dhis.mobile.ui.designsystem.component.IconButton
-import org.hisp.dhis.mobile.ui.designsystem.component.IconButtonStyle
+//import com.xavim.testsimpleact.domain.model.DataElementValueType
 import org.hisp.dhis.mobile.ui.designsystem.component.Title
 import org.hisp.dhis.mobile.ui.designsystem.component.TopBar
 import org.hisp.dhis.mobile.ui.designsystem.component.TopBarType
@@ -80,14 +78,12 @@ fun AppScaffold(
                 title = { Title(text = topBarTitle, textColor = TextColor.OnPrimary) },
                 type = TopBarType.CENTERED,
                 navigationIcon = {
-                    IconButton(onClick = onMenuClick){
-
+                    IconButton(onClick = onMenuClick) {
                         Icon(
                             imageVector = Icons.Outlined.Menu,
                             contentDescription = "Menu",
                             tint = TextColor.OnPrimary
                         )
-
                     }
                 },
                 actions = { /* If you have extra actions, place them here */ },
@@ -182,9 +178,9 @@ fun PasswordInputField(
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
                         imageVector = if (passwordVisible)
-                            androidx.compose.material.icons.Icons.Default.Visibility
+                            Icons.Default.Visibility
                         else
-                            androidx.compose.material.icons.Icons.Default.VisibilityOff,
+                            Icons.Default.VisibilityOff,
                         contentDescription = if (passwordVisible) "Hide password" else "Show password"
                     )
                 }
@@ -205,53 +201,53 @@ fun PasswordInputField(
 /**
  * Numeric input field for data entry
  */
-@Composable
-fun NumericInputField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    error: String? = null,
-    valueType: com.xavim.testsimpleact.domain.model.DataElementValueType
-) {
-    val focusManager = LocalFocusManager.current
-    val keyboardType = when {
-        valueType == DataElementValueType.INTEGER ||
-                valueType == DataElementValueType.INTEGER_POSITIVE ||
-                valueType == DataElementValueType.INTEGER_NEGATIVE ||
-                valueType == DataElementValueType.INTEGER_ZERO_OR_POSITIVE -> KeyboardType.Number
-        valueType == DataElementValueType.NUMBER ||
-                valueType == DataElementValueType.PERCENTAGE ||
-                valueType == DataElementValueType.UNIT_INTERVAL -> KeyboardType.Decimal
-        else -> KeyboardType.Text
-    }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            label = { Text(label) },
-            isError = error != null,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = keyboardType,
-                imeAction = ImeAction.Next
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
-        )
-
-        if (error != null) {
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
-        }
-    }
-}
+//@Composable
+//fun NumericInputField(
+//    label: String,
+//    value: String,
+//    onValueChange: (String) -> Unit,
+//    error: String? = null,
+//    valueType: DataElementValueType
+//) {
+//    val focusManager = LocalFocusManager.current
+//    val keyboardType = when {
+//        valueType == DataElementValueType.INTEGER ||
+//                valueType == DataElementValueType.INTEGER_POSITIVE ||
+//                valueType == DataElementValueType.INTEGER_NEGATIVE ||
+//                valueType == DataElementValueType.INTEGER_ZERO_OR_POSITIVE -> KeyboardType.Number
+//        valueType == DataElementValueType.NUMBER ||
+//                valueType == DataElementValueType.PERCENTAGE ||
+//                valueType == DataElementValueType.UNIT_INTERVAL -> KeyboardType.Decimal
+//        else -> KeyboardType.Text
+//    }
+//
+//    Column(modifier = Modifier.fillMaxWidth()) {
+//        OutlinedTextField(
+//            value = value,
+//            onValueChange = onValueChange,
+//            label = { Text(label) },
+//            isError = error != null,
+//            modifier = Modifier.fillMaxWidth(),
+//            singleLine = true,
+//            keyboardOptions = KeyboardOptions(
+//                keyboardType = keyboardType,
+//                imeAction = ImeAction.Next
+//            ),
+//            keyboardActions = KeyboardActions(
+//                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+//            )
+//        )
+//
+//        if (error != null) {
+//            Text(
+//                text = error,
+//                color = MaterialTheme.colorScheme.error,
+//                style = MaterialTheme.typography.bodySmall,
+//                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+//            )
+//        }
+//    }
+//}
 
 /**
  * Date input field for data entry
@@ -280,7 +276,7 @@ fun DateInputField(
             trailingIcon = {
                 IconButton(onClick = { showDatePicker = true }) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.DateRange,
+                        imageVector = Icons.Default.DateRange,
                         contentDescription = "Select date"
                     )
                 }
@@ -339,9 +335,9 @@ fun OptionSetField(
                 IconButton(onClick = { expanded = true }) {
                     Icon(
                         imageVector = if (expanded)
-                            androidx.compose.material.icons.Icons.Default.ArrowDropUp
+                            Icons.Default.ArrowDropUp
                         else
-                            androidx.compose.material.icons.Icons.Default.ArrowDropDown,
+                            Icons.Default.ArrowDropDown,
                         contentDescription = if (expanded) "Close options" else "Open options"
                     )
                 }
@@ -509,4 +505,3 @@ fun DatePickerDialog(
         }
     )
 }
-

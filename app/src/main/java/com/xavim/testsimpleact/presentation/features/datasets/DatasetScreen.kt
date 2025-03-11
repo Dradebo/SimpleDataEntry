@@ -16,10 +16,10 @@ import org.hisp.dhis.mobile.ui.designsystem.component.state.rememberListCardStat
 
 @Composable
 fun DatasetScreen(
-    onDatasetClick: (Any?) -> Unit,
-    onLogout: () -> Unit
+    onDatasetClick: (String) -> Unit,
+    onLogout: () -> Unit,
+    viewModel: DatasetGridViewModel = hiltViewModel()
 ) {
-    val viewModel: DatasetGridViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
 
     when (val currentState = uiState) {

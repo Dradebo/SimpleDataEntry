@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.google.android.gms.fido.fido2.api.common.ErrorCode
 import com.xavim.testsimpleact.domain.repository.AuthRepository
 import com.xavim.testsimpleact.domain.repository.LoginResult
 import com.xavim.testsimpleact.domain.repository.SessionInfo
@@ -16,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.maintenance.D2Error
+import org.hisp.dhis.android.core.maintenance.D2ErrorCode
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -96,30 +96,58 @@ class AuthRepositoryImpl @Inject constructor(
                     )
 
                     return@withContext LoginResult.SUCCESS
-                } catch (e: D2Error) {
-                    Log.e( "Login error", e.toString())
+                } catch (e: Exception) {
+                    Log.e("AuthRepository", "Login error", e)
 
-                    // Record failed attempt
-                    recordFailedLoginAttempt(username)
+                    // Record failed attempt unless it's an "already authenticated" error
+                    if (!isAlreadyAuthenticatedError(e)) {
+                        recordFailedLoginAttempt(username)
+                    } else {
+                        // If already authenticated, consider it a success
+                        return@withContext LoginResult.SUCCESS
+                    }
 
-                    return@withContext when (e.errorCode()) {
-                        D2Error.ErrorCode.ALREADY_AUTHENTICATED -> LoginResult.SUCCESS
-                        D2Error.ErrorCode.BAD_CREDENTIALS -> LoginResult.INVALID_CREDENTIALS
-                        D2Error.ErrorCode.SOCKET_TIMEOUT,
-                        D2Error.ErrorCode.API_RESPONSE_PROCESS_ERROR,
-                        D2Error.ErrorCode.NO_DHIS2_SERVER -> LoginResult.SERVER_ERROR
-                        D2Error.ErrorCode.UNKNOWN_HOST,
-                        D2Error.ErrorCode.NETWORK_ERROR -> LoginResult.NETWORK_ERROR
-                        else -> LoginResult.SERVER_ERROR
+                    // Process specific D2Errors
+                    when {
+                        isAlreadyAuthenticatedError(e) -> return@withContext LoginResult.SUCCESS
+                        isBadCredentialsError(e) -> return@withContext LoginResult.INVALID_CREDENTIALS
+                        isServerError(e) -> return@withContext LoginResult.SERVER_ERROR
+                        isNetworkError(e) -> return@withContext LoginResult.NETWORK_ERROR
+                        else -> return@withContext LoginResult.SERVER_ERROR
                     }
                 }
             } catch (e: Exception) {
-                Log.e( "Unexpected login error", e.toString())
+                Log.e("AuthRepository", "Unexpected login error", e)
                 return@withContext LoginResult.SERVER_ERROR
             }
         }
     }
 
+    // Helper methods to check error types
+    private fun isAlreadyAuthenticatedError(e: Exception): Boolean {
+        val message = e.toString().lowercase()
+        return message.contains("already_authenticated") ||
+                message.contains("already authenticated")
+    }
+
+    private fun isBadCredentialsError(e: Exception): Boolean {
+        val message = e.toString().lowercase()
+        return message.contains("bad_credentials") ||
+                message.contains("invalid credentials")
+    }
+
+    private fun isServerError(e: Exception): Boolean {
+        val message = e.toString().lowercase()
+        return message.contains("socket_timeout") ||
+                message.contains("api_response_process_error") ||
+                message.contains("no_dhis2_server")
+    }
+
+    private fun isNetworkError(e: Exception): Boolean {
+        val message = e.toString().lowercase()
+        return message.contains("unknown_host") ||
+                message.contains("network_error")
+    }
     override suspend fun logout() {
         withContext(Dispatchers.IO) {
             try {
@@ -127,7 +155,7 @@ class AuthRepositoryImpl @Inject constructor(
                 clearStoredCredentials()
                 _sessionInfo.value = SessionInfo(isLoggedIn = false)
             } catch (e: Exception) {
-                Log.e( "Logout error", e.toString())
+                Log.e("AuthRepositoryImpl", "Logout error", e)
             }
         }
     }
