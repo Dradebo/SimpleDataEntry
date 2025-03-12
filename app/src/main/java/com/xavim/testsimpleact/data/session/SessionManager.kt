@@ -103,6 +103,16 @@ class SessionManager @Inject constructor(
      * Check if the user is logged in
      * @return true if the user is logged in, false otherwise
      */
+//    fun isSessionActive(): Boolean {
+//        return try {
+//            d2?.userModule()?.isLogged()?.blockingGet() ?: false
+//        } catch (e: Exception) {
+//            logger.e("SessionManager", "Error checking if user is logged in", e)
+//            false
+//        }
+//    }
+
+
     fun isSessionActive(): Boolean {
         return try {
             d2?.userModule()?.isLogged()?.blockingGet() ?: false
@@ -111,6 +121,7 @@ class SessionManager @Inject constructor(
             false
         }
     }
+
 
     /**
      * Record user interaction to reset the session timeout

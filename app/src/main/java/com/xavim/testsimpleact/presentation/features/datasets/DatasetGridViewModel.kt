@@ -34,9 +34,6 @@ class DatasetGridViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Check if we need to initialize
-                if (sessionManager.getD2() == null) {
-                    sessionManager.initD2(context)
-                }
 
                 fetchDataSets()
             } catch (e: Exception) {

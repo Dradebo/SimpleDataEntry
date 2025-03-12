@@ -13,8 +13,10 @@ import com.xavim.testsimpleact.domain.usecase.LogoutUseCase
 import com.xavim.testsimpleact.domain.usecase.ValidateSessionUseCase
 import com.xavim.testsimpleact.domain.usecase.VerifyCredentialsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -40,8 +42,8 @@ class LoginViewModel @Inject constructor(
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Initial)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
-    private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
-    val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
+    private val _navigationEvent = MutableSharedFlow<NavigationEvent>(extraBufferCapacity = 1)
+    val navigationEvent = _navigationEvent.asSharedFlow()
 
     private val _serverUrl = MutableStateFlow("")
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
@@ -66,12 +68,12 @@ class LoginViewModel @Inject constructor(
                     // If we have an active session, try to validate it
                     val isValid = validateSessionUseCase()
                     if (isValid) {
-                        _navigationEvent.value = NavigationEvent.NavigateToDatasets
+                        _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
                     } else {
                         // Session existed but is no longer valid (e.g., expired)
                         // We'll show login but pre-fill credentials
                         loadStoredCredentials()
-                        _navigationEvent.value = NavigationEvent.NavigateToLogin
+                        _navigationEvent.emit(NavigationEvent.NavigateToLogin)
                     }
                 } else {
                     // No active session, load stored credentials if available
@@ -85,7 +87,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             val isSessionValid = validateSessionUseCase()
             if (isSessionValid) {
-                _navigationEvent.value = NavigationEvent.NavigateToDatasets
+                _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
             }
         }
     }
@@ -140,37 +142,57 @@ class LoginViewModel @Inject constructor(
     }
 
     fun login() {
+
+
+
+        // Check form validity; if not valid, emit a message and return.
         if (!_isFormValid.value) {
-            _navigationEvent.value = NavigationEvent.ShowMessage("Please fill all fields with valid values")
+            viewModelScope.launch {
+                _navigationEvent.emit(
+                    NavigationEvent.ShowMessage("Please fill all fields with valid values")
+                )
+            }
             return
         }
 
+        // Launch a coroutine for the login process.
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
 
+
+            if ((_sessionInfo.value?.isLoggedIn == true) && verifyCredentialsUseCase(_serverUrl.value, _username.value, _password.value)){
+
+                viewModelScope.launch {
+                _loginState.value = LoginState.Success
+                _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
+
+                }
+                return@launch
+            }
+
+            // Call your suspend login use case (e.g., loginUseCase might be a suspend function)
             val result = loginUseCase(_serverUrl.value, _username.value, _password.value)
 
             when (result) {
                 LoginResult.SUCCESS -> {
-                    Log.d("Login Success", "Navigating to dataset screen")
                     _loginState.value = LoginState.Success
-                    _navigationEvent.value = NavigationEvent.NavigateToDatasets
+                    _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
                 }
                 LoginResult.INVALID_CREDENTIALS -> {
                     _loginState.value = LoginState.Error("Invalid username or password")
-                    _navigationEvent.value = NavigationEvent.ShowMessage("Invalid username or password")
+                    _navigationEvent.emit(NavigationEvent.ShowMessage("Invalid username or password"))
                 }
                 LoginResult.NETWORK_ERROR -> {
                     _loginState.value = LoginState.Error("Network error. Please check your connection")
-                    _navigationEvent.value = NavigationEvent.ShowMessage("Network error. Please check your connection")
+                    _navigationEvent.emit(NavigationEvent.ShowMessage("Network error. Please check your connection"))
                 }
                 LoginResult.SERVER_ERROR -> {
                     _loginState.value = LoginState.Error("Server error. Please try again later")
-                    _navigationEvent.value = NavigationEvent.ShowMessage("Server error. Please try again later")
+                    _navigationEvent.emit(NavigationEvent.ShowMessage("Server error. Please try again later"))
                 }
                 LoginResult.ACCOUNT_LOCKED -> {
                     _loginState.value = LoginState.Error("Account locked due to too many failed attempts")
-                    _navigationEvent.value = NavigationEvent.ShowMessage("Account locked due to too many failed attempts. Please try again later")
+                    _navigationEvent.emit(NavigationEvent.ShowMessage("Account locked due to too many failed attempts. Please try again later"))
                 }
             }
         }
@@ -185,12 +207,9 @@ class LoginViewModel @Inject constructor(
                 _loginState.value = LoginState.Initial
             } catch (e: Exception) {
                 Log.e("LoginViewModel", "Logout error", e)
-                _navigationEvent.value = NavigationEvent.ShowMessage("Error logging out: ${e.message}")
+                _navigationEvent.emit(NavigationEvent.ShowMessage("Error logging out: ${e.message}"))
             }
         }
     }
 
-    fun clearNavigationEvent() {
-        _navigationEvent.value = null
-    }
 }

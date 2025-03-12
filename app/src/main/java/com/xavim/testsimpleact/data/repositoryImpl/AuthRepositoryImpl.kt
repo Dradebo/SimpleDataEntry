@@ -53,11 +53,25 @@ class AuthRepositoryImpl @Inject constructor(
 
     private val _sessionInfo = MutableStateFlow(SessionInfo(isLoggedIn = false))
 
+//    init {
+//        // Initialize session state
+//        val serverUrl = securePreferences.getString(KEY_SERVER_URL, null)
+//        val username = securePreferences.getString(KEY_USERNAME, null)
+//        val isLoggedIn = (d2Provider()?.userModule()?.blockingIsLogged() == true)
+//
+//        _sessionInfo.value = SessionInfo(
+//            isLoggedIn = isLoggedIn,
+//            username = username,
+//            serverUrl = serverUrl,
+//            lastLoginTime = securePreferences.getLong(KEY_LAST_LOGIN_TIME, 0)
+//        )
+//    }
+
     init {
         // Initialize session state
         val serverUrl = securePreferences.getString(KEY_SERVER_URL, null)
         val username = securePreferences.getString(KEY_USERNAME, null)
-        val isLoggedIn = (d2Provider()?.userModule()?.blockingIsLogged() == true)
+        val isLoggedIn = (d2Provider()?.userModule()?.isLogged()?.blockingGet() == true)
 
         _sessionInfo.value = SessionInfo(
             isLoggedIn = isLoggedIn,
@@ -66,6 +80,49 @@ class AuthRepositoryImpl @Inject constructor(
             lastLoginTime = securePreferences.getLong(KEY_LAST_LOGIN_TIME, 0)
         )
     }
+
+//    override suspend fun login(serverUrl: String, username: String, password: String): LoginResult {
+//        return withContext(Dispatchers.IO) {
+//            try {
+//                // Check if already logged in to avoid the error
+//                val logged = d2Provider()!!.userModule().isLogged()
+//                if (logged) {
+//                    return@withContext LoginResult.SUCCESS
+//                }
+//
+//                d2Provider()?.userModule()?.blockingLogIn(serverUrl, username, password)
+//                LoginResult.SUCCESS
+//            } catch (e: Exception) {
+//                // Check if the error is "already authenticated"
+//                val d2Error = (e.cause as? org.hisp.dhis.android.core.maintenance.D2Error)
+//                if (d2Error?.errorCode() == org.hisp.dhis.android.core.maintenance.D2ErrorCode.ALREADY_AUTHENTICATED) {
+//                    // This is actually a success case - user is already logged in
+//                    return@withContext LoginResult.SUCCESS
+//                }
+//
+//                    return@withContext LoginResult.SUCCESS
+//                } catch (e: Exception) {
+//                    Log.e("AuthRepository", "Login error", e)
+//
+//                    // Record failed attempt unless it's an "already authenticated" error
+//                    if (!isAlreadyAuthenticatedError(e)) {
+//                        recordFailedLoginAttempt(username)
+//                    } else {
+//                        // If already authenticated, consider it a success
+//                        return@withContext LoginResult.SUCCESS
+//                    }
+//
+//                    // Process specific D2Errors
+//                    when {
+//                        isAlreadyAuthenticatedError(e) -> return@withContext LoginResult.SUCCESS
+//                        isBadCredentialsError(e) -> return@withContext LoginResult.INVALID_CREDENTIALS
+//                        isServerError(e) -> return@withContext LoginResult.SERVER_ERROR
+//                        isNetworkError(e) -> return@withContext LoginResult.NETWORK_ERROR
+//                        else -> return@withContext LoginResult.SERVER_ERROR
+//                    }
+//                }
+//            }
+//    }
 
     override suspend fun login(serverUrl: String, username: String, password: String): LoginResult {
         return withContext(Dispatchers.IO) {
@@ -77,6 +134,12 @@ class AuthRepositoryImpl @Inject constructor(
                 }
 
                 val d2 = d2Provider() ?: return@withContext LoginResult.SERVER_ERROR
+
+                // Check if already logged in - FIXED: Added blockingGet()
+                if (d2.userModule().isLogged().blockingGet()) {
+                    // User is already logged in, consider it a success
+                    return@withContext LoginResult.SUCCESS
+                }
 
                 try {
                     d2.userModule().blockingLogIn(username, password, serverUrl)
@@ -99,21 +162,19 @@ class AuthRepositoryImpl @Inject constructor(
                 } catch (e: Exception) {
                     Log.e("AuthRepository", "Login error", e)
 
-                    // Record failed attempt unless it's an "already authenticated" error
-                    if (!isAlreadyAuthenticatedError(e)) {
-                        recordFailedLoginAttempt(username)
-                    } else {
-                        // If already authenticated, consider it a success
-                        return@withContext LoginResult.SUCCESS
-                    }
-
                     // Process specific D2Errors
                     when {
                         isAlreadyAuthenticatedError(e) -> return@withContext LoginResult.SUCCESS
-                        isBadCredentialsError(e) -> return@withContext LoginResult.INVALID_CREDENTIALS
+                        isBadCredentialsError(e) -> {
+                            recordFailedLoginAttempt(username)
+                            return@withContext LoginResult.INVALID_CREDENTIALS
+                        }
                         isServerError(e) -> return@withContext LoginResult.SERVER_ERROR
                         isNetworkError(e) -> return@withContext LoginResult.NETWORK_ERROR
-                        else -> return@withContext LoginResult.SERVER_ERROR
+                        else -> {
+                            recordFailedLoginAttempt(username)
+                            return@withContext LoginResult.SERVER_ERROR
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -122,6 +183,7 @@ class AuthRepositoryImpl @Inject constructor(
             }
         }
     }
+
 
     // Helper methods to check error types
     private fun isAlreadyAuthenticatedError(e: Exception): Boolean {
@@ -162,10 +224,25 @@ class AuthRepositoryImpl @Inject constructor(
 
     override fun getSessionInfo(): Flow<SessionInfo> = _sessionInfo.asStateFlow()
 
+//    override suspend fun validateSession(): Boolean {
+//        return withContext(Dispatchers.IO) {
+//            val d2 = d2Provider() ?: return@withContext false
+//            val isLogged = d2.userModule().blockingIsLogged()
+//
+//            // Update our session info if the state has changed
+//            if (isLogged != _sessionInfo.value.isLoggedIn) {
+//                _sessionInfo.value = _sessionInfo.value.copy(isLoggedIn = isLogged)
+//            }
+//
+//            return@withContext isLogged && !isSessionExpired()
+//        }
+//    }
+
+
     override suspend fun validateSession(): Boolean {
         return withContext(Dispatchers.IO) {
             val d2 = d2Provider() ?: return@withContext false
-            val isLogged = d2.userModule().blockingIsLogged()
+            val isLogged = d2.userModule().isLogged().blockingGet()
 
             // Update our session info if the state has changed
             if (isLogged != _sessionInfo.value.isLoggedIn) {

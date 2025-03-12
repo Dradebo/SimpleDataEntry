@@ -49,7 +49,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     val loginState by viewModel.loginState.collectAsStateWithLifecycle()
-    val navigationEvent by viewModel.navigationEvent.collectAsStateWithLifecycle()
+    val navigationEvent by viewModel.navigationEvent.collectAsState(NavigationEvent.NavigateToLogin)
     val serverUrl by viewModel.serverUrl.collectAsStateWithLifecycle()
     val username by viewModel.username.collectAsStateWithLifecycle()
     val password by viewModel.password.collectAsStateWithLifecycle()
@@ -64,18 +64,18 @@ fun LoginScreen(
     }
 
     // Handle navigation events
-    LaunchedEffect(navigationEvent) {
-        when (val event = navigationEvent) {
-            is NavigationEvent.NavigateToDatasets -> {
-                onLoginSuccess()
-                viewModel.clearNavigationEvent()
-            }
-            is NavigationEvent.ShowMessage -> {
-                snackbarHostState.showSnackbar(event.message)
-                viewModel.clearNavigationEvent()
-            }
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is NavigationEvent.NavigateToDatasets -> {
+                    onLoginSuccess()
+                }
+                is NavigationEvent.ShowMessage -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
             else -> { /* No action needed */ }
         }
+    }
     }
 
     Scaffold(
