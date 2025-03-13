@@ -142,6 +142,8 @@ class AuthRepositoryImpl @Inject constructor(
                 }
 
                 try {
+
+                    Log.d("AuthRepository", "Attempting login")
                     d2.userModule().blockingLogIn(username, password, serverUrl)
 
                     // If login successful, store credentials and reset failed attempts

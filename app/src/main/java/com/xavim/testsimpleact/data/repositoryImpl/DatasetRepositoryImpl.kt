@@ -1,5 +1,6 @@
 package com.xavim.testsimpleact.data.repositoryImpl
 
+import android.util.Log
 import com.xavim.testsimpleact.domain.model.Dataset
 import com.xavim.testsimpleact.domain.repository.DatasetRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,8 @@ class DatasetRepositoryImpl(
      * Emits the result as a Flow.
      */
     override fun getDatasets(): Flow<List<Dataset>> = flow {
+
+        Log.d("DatasetRepository", "Fetching datasets from DHIS2")
         val dataSets = d2.dataSetModule()
             .dataSets()
             .blockingGet()

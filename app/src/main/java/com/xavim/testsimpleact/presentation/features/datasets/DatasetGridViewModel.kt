@@ -27,6 +27,8 @@ class DatasetGridViewModel @Inject constructor(
     val uiState: StateFlow<DatasetScreenState> = _uiState
 
     init {
+
+        Log.d("DatasetViewModel", "DatasetGridViewModel initialized")
         loadData()
     }
 
@@ -55,6 +57,8 @@ class DatasetGridViewModel @Inject constructor(
                     )
                 }
                 .collect { datasets ->
+
+                    Log.d("DatasetViewModel", "Fetched ${datasets.size} datasets")
                     _uiState.value = DatasetScreenState.Success(datasets)
                 }
         } catch (e: Exception) {

@@ -65,6 +65,8 @@ class LoginViewModel @Inject constructor(
                 _sessionInfo.value = info
 
                 if (info.isLoggedIn) {
+
+                    Log.d("LoginViewModel", "Session is active, checking validity")
                     // If we have an active session, try to validate it
                     val isValid = validateSessionUseCase()
                     if (isValid) {
@@ -86,8 +88,13 @@ class LoginViewModel @Inject constructor(
     fun checkActiveSession() {
         viewModelScope.launch {
             val isSessionValid = validateSessionUseCase()
+
+            Log.d("LoginViewModel", "Session valid: $isSessionValid")
             if (isSessionValid) {
+
+                _loginState.value = LoginState.Success
                 _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
+                Log.d("LoginViewModel", "Navigation event emitted: NavigateToDatasets")
             }
         }
     }
@@ -159,7 +166,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
 
-
+            Log.d("LoginViewModel", "Attempting login")
             if ((_sessionInfo.value?.isLoggedIn == true) && verifyCredentialsUseCase(_serverUrl.value, _username.value, _password.value)){
 
                 viewModelScope.launch {
@@ -177,6 +184,7 @@ class LoginViewModel @Inject constructor(
                 LoginResult.SUCCESS -> {
                     _loginState.value = LoginState.Success
                     _navigationEvent.emit(NavigationEvent.NavigateToDatasets)
+                    Log.d("LoginViewModel", "Navigation event emitted: NavigateToDatasets")
                 }
                 LoginResult.INVALID_CREDENTIALS -> {
                     _loginState.value = LoginState.Error("Invalid username or password")

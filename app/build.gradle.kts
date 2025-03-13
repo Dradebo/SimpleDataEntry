@@ -54,7 +54,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)      // same note as above
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)        // stable version, matching the BOM
-
+    implementation("androidx.compose.material:material-icons-core:1.5.4")
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
 // DHIS2 libraries (fine, presumably)
     implementation("org.hisp.dhis:android-core:1.11.0")
@@ -62,7 +63,7 @@ dependencies {
     implementation(libs.play.services.tflite.support)
     implementation(libs.androidx.security.crypto.ktx)
     implementation(libs.play.services.fido)
-
+    implementation("org.hisp.dhis.mobile:designsystem-android:0.4.1")
 // Hilt
     val hiltVersion = "2.48"
     implementation("com.google.dagger:hilt-android:$hiltVersion")

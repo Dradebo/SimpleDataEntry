@@ -1,5 +1,6 @@
 package com.xavim.testsimpleact.presentation.features.login
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,8 @@ fun LoginScreen(
         viewModel.navigationEvent.collect { event ->
             when (event) {
                 is NavigationEvent.NavigateToDatasets -> {
+
+                    Log.d("LoginScreen", "Navigation event received: NavigateToDatasets")
                     onLoginSuccess()
                 }
                 is NavigationEvent.ShowMessage -> {

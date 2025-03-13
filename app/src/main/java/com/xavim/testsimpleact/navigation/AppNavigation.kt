@@ -1,5 +1,8 @@
 package com.xavim.testsimpleact.navigation
 
+
+import android.util.Log
+
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -14,7 +17,7 @@ import com.xavim.testsimpleact.presentation.features.login.LoginScreen
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
-    object DatasetList : Screen("dataset_list")
+    object Datasets : Screen("datasets")
 
     object DatasetInstanceList : Screen("dataset_instances/{datasetId}") {
         fun createRoute(datasetId: String) = "dataset_instances/$datasetId"
@@ -57,22 +60,27 @@ fun AppNavigation(navController: NavHostController) {
             LoginScreen(
                 onLoginSuccess = {
 
-                    navController.navigate(Screen.DatasetList.route) {
+                    Log.d("Navigation", "Navigating to Dataset list")
+
+                    navController.navigate(Screen.Datasets.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
+
+
                 }
             )
         }
 
         // Dataset List Screen
-        composable(Screen.DatasetList.route) {
+        composable(Screen.Datasets.route) {
             DatasetScreen(
                 onDatasetClick = { datasetId ->
                     navController.navigate(Screen.DatasetInstanceList.createRoute(datasetId.toString()))
                 },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.DatasetList.route) { inclusive = true }
+                        popUpTo(Screen.Datasets.route) { inclusive = true }
                     }
                 }
             )
