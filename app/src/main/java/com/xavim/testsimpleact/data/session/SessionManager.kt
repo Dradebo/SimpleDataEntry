@@ -1,6 +1,7 @@
 package com.xavim.testsimpleact.data.session
 
 import android.content.Context
+import android.util.Log
 import com.xavim.testsimpleact.data.repositoryImpl.AndroidLogger
 import com.xavim.testsimpleact.domain.model.Dhis2Config
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +76,7 @@ class SessionManager @Inject constructor(
                 onUserInteraction() // Set initial interaction time
                 preferences.setValue(Preference.SERVER_URL.toString(), serverUrl)
                 preferences.setValue(Preference.USERNAME.toString(), username)
+                Log.d("SessionManager", "Login successful")
             }
             emit(loginSuccessful as Boolean)
         } catch (e: Exception) {

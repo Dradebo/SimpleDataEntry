@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.xavim.testsimpleact.data.session.SessionManager
 import com.xavim.testsimpleact.domain.repository.AuthRepository
 import com.xavim.testsimpleact.domain.repository.LoginResult
 import com.xavim.testsimpleact.domain.repository.SessionInfo
@@ -23,7 +24,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val context: Context,
-    private val d2Provider: () -> D2?
+    private val d2Provider: () -> D2?,
+    private val sessionManager: SessionManager
 ) : AuthRepository {
 
     companion object {
@@ -144,7 +146,7 @@ class AuthRepositoryImpl @Inject constructor(
                 try {
 
                     Log.d("AuthRepository", "Attempting login")
-                    d2.userModule().blockingLogIn(username, password, serverUrl)
+                    sessionManager.login(serverUrl,username,password)
 
                     // If login successful, store credentials and reset failed attempts
                     storeCredentials(serverUrl, username, password)

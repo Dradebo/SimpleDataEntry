@@ -19,6 +19,9 @@ class DatasetRepositoryImpl(
     override fun getDatasets(): Flow<List<Dataset>> = flow {
 
         Log.d("DatasetRepository", "Fetching datasets from DHIS2")
+
+
+
         val dataSets = d2.dataSetModule()
             .dataSets()
             .blockingGet()
